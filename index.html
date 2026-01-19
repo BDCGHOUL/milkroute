@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Milkman Helper Pro</title>
+    <style>
+        body { background: #000; color: #fff; font-family: sans-serif; text-align: center; margin: 0; padding: 20px; }
+        .section { border: 1px solid #333; padding: 15px; border-radius: 15px; margin-bottom: 20px; background: #111; }
+        .big-count { font-size: 80px; font-weight: bold; color: #2ecc71; line-height: 1; }
+        .next-addr { font-size: 20px; color: #00bfff; margin: 15px 0; min-height: 40px; font-weight: bold;}
+        .btn-row { display: flex; justify-content: center; gap: 10px; margin-bottom: 10px;}
+        .nav-btn { background: #333; color: white; border: none; padding: 15px 25px; border-radius: 8px; font-size: 16px; flex: 1; }
+        input { width: 80%; font-size: 40px; text-align: center; background: #222; border: 1px solid #444; color: white; border-radius: 10px; padding: 10px; margin-top: 10px;}
+        .res-grid { display: grid; grid-template-columns: 1fr 1fr; margin-top: 15px; }
+        .res-val { font-size: 35px; font-weight: bold; }
+        .packs { color: #2ecc71; }
+        .loose { color: #e67e22; }
+    </style>
+</head>
+<body>
+
+    <div class="section">
+        <button id="start-btn" class="nav-btn" style="background: #27ae60; width: 100%; margin-bottom: 20px;" onclick="initGPS()">
+            ACTIVATE GPS TRACKING
+        </button>
+
+        <div style="color: #aaa; font-size: 14px;">CALLS REMAINING</div>
+        <div id="rem-count" class="big-count">---</div>
+        <div id="next-addr" class="next-addr">Tap Start Above</div>
+        
+        <div class="btn-row">
+            <button class="nav-btn" onclick="changeStop(-1)">BACK</button>
+            <button class="nav-btn" style="background: #c0392b;" onclick="changeStop(1)">SKIP</button>
+        </div>
+        <div id="gps-status" style="font-size: 11px; color: #555;">GPS: Offline</div>
+    </div>
+
+    <div class="section">
+        <div style="color: #aaa; font-size: 14px;">PACK CALCULATOR (18s)</div>
+        <input type="number" id="calc-in" pattern="\d*" placeholder="0" oninput="doCalc()">
+        <div class="res-grid">
+            <div><span class="res-val packs" id="p-out">0</span><br><small>PACKS</small></div>
+            <div><span class="res-val loose" id="l-out">0</span><br><small>LOOSE</small></div>
+        </div>
+    </div>
+
+    <script>
+        // ADD YOUR TEST CUSTOMERS HERE (Cherry Pick 3 locations near your house)
+        const myRoute = [
+            {addr: "TEST 1: Stop Name", lat: 52.1234, lng: -0.1234},
+            {addr: "TEST 2: Stop Name", lat: 52.1245, lng: -0.1245},
+            {addr: "TEST 3: Stop Name", lat: 52.1256, lng: -0.1256}
+        ];
+
+        let index = parseInt(localStorage.getItem('milkman_index')) || 0;
+
+        function initGPS() {
+            if ("geolocation" in navigator) {
+                navigator.geolocation.watchPosition(checkLocation, gpsError, { enableHighAccuracy: true });
+                document.getElementById('start-btn').style.display = 'none';
+                updateUI();
+            }
+        }
+
+        function checkLocation(pos) {
+            const myLat = pos.coords.latitude;
+            const myLng = pos.coords.longitude;
+            document.getElementById('gps-status').innerText = `GPS Active (Accuracy: ${pos.coords.accuracy.toFixed(1)}m)`;
+
+            if (!myRoute[index]) return;
+
+            const dist = getDist(myLat, myLng, myRoute[index].lat, myRoute[index].lng);
+            
+            // Trigger distance (30 meters)
+            if (dist < 30) {
+                index++;
+                saveProgress();
+                updateUI();
+                if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+            }
+        }
+
+        function getDist(lat1, lon1, lat2, lon2) {
+            const R = 6371000;
+            const dLat = (lat2-lat1) * Math.PI/180;
+            const dLon = (lon2-lon1) * Math.PI/180;
+            const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        function updateUI() {
+            document.getElementById('rem-count').innerText = myRoute.length - index;
+            document.getElementById('next-addr').innerText = myRoute[index] ? myRoute[index].addr : "ROUTE FINISHED";
+        }
+
+        function changeStop(dir) {
+            index = Math.max(0, Math.min(myRoute.length, index + dir));
+            saveProgress();
+            updateUI();
+        }
+
+        function saveProgress() { localStorage.setItem('milkman_index', index); }
+        function gpsError(err) { document.getElementById('gps-status').innerText = "GPS Error: " + err.message; }
+        function doCalc() {
+            let v = document.getElementById('calc-in').value;
+            document.getElementById('p-out').innerText = v ? Math.floor(v / 18) : 0;
+            document.getElementById('l-out').innerText = v ? v % 18 : 0;
+        }
+    </script>
+</body>
+</html>
