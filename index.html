@@ -3,141 +3,203 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Milkman Logistics Pro</title>
+    <title>Logistics Pro</title>
     <style>
         :root {
-            --bg: #0a0a0b;
-            --card: #161618;
-            --accent: #007aff;
-            --success: #34c759;
-            --warning: #ff9500;
-            --danger: #ff3b30;
+            --bg: #000000;
+            --card: #1c1c1e;
+            --accent: #0a84ff;
+            --success: #32d74b;
+            --warning: #ffd60a;
+            --danger: #ff453a;
             --text: #ffffff;
             --text-dim: #8e8e93;
         }
 
         body { 
-            background: var(--bg); 
-            color: var(--text); 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-            margin: 0; padding: 15px;
-            overscroll-behavior: none;
+            background: var(--bg); color: var(--text); 
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
+            margin: 0; padding: 12px; overscroll-behavior: none;
         }
 
-        .header { padding: 10px 0 20px; text-align: left; }
-        .header h1 { margin: 0; font-size: 22px; letter-spacing: -0.5px; }
-
-        /* Route Selector */
-        .tabs { display: flex; background: #222; padding: 4px; border-radius: 12px; margin-bottom: 20px; }
-        .tab-btn { 
-            flex: 1; border: none; background: none; color: var(--text-dim); 
-            padding: 10px; border-radius: 8px; font-weight: 600; font-size: 14px; 
-            transition: all 0.2s;
-        }
-        .tab-btn.active { background: #444; color: white; box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
-
-        .card { 
-            background: var(--card); border: 1px solid #2c2c2e; 
-            padding: 20px; border-radius: 20px; margin-bottom: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        #overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg); z-index: 999; display: flex;
+            flex-direction: column; align-items: center; justify-content: center;
         }
 
-        .label { color: var(--text-dim); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
-        .big-val { font-size: 64px; font-weight: 800; line-height: 1; color: var(--success); margin: 5px 0; }
-        .addr-text { font-size: 20px; font-weight: 600; color: var(--accent); min-height: 50px; display: flex; align-items: center; justify-content: center; }
+        .header { padding: 5px 0 10px; display: flex; justify-content: space-between; align-items: flex-end; }
+        .header h1 { margin: 0; font-size: 16px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+        
+        .prog-container { width: 100%; height: 4px; background: #333; border-radius: 2px; margin-bottom: 15px; overflow: hidden; }
+        #prog-fill { height: 100%; width: 0%; background: var(--accent); transition: width 0.5s ease; }
 
-        .btn-group { display: flex; gap: 10px; margin-top: 15px; }
-        .btn { 
-            flex: 1; border: none; padding: 16px; border-radius: 12px; 
-            font-weight: 700; font-size: 15px; transition: opacity 0.1s; 
-        }
-        .btn:active { opacity: 0.7; }
-        .btn-sec { background: #2c2c2e; color: white; }
-        .btn-skip { background: #3a1e1e; color: var(--danger); }
+        .card { background: var(--card); border-radius: 16px; padding: 16px; margin-bottom: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+        .label { color: var(--text-dim); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+        .big-val { font-size: 64px; font-weight: 800; color: var(--success); margin: 0; }
+        .addr-text { font-size: 20px; font-weight: 600; color: var(--accent); min-height: 50px; display: flex; align-items: center; justify-content: center; text-align: center; }
 
-        /* Calc Section */
-        .calc-input { 
-            width: 100%; box-sizing: border-box; background: #000; border: 1px solid #333; 
-            color: var(--text); font-size: 32px; font-weight: 700; padding: 15px; 
-            border-radius: 12px; text-align: center; margin-bottom: 15px;
-        }
-        .res-box { display: flex; justify-content: space-around; }
-        .res-item span { display: block; font-size: 30px; font-weight: 800; }
+        .btn-group { display: flex; gap: 8px; margin-top: 12px; }
+        .btn { flex: 1; border: none; padding: 14px; border-radius: 10px; font-weight: 700; font-size: 14px; cursor: pointer; }
+        .btn-start { background: var(--accent); color: white; padding: 12px 40px; flex: none; width: auto; }
+        
+        .hold-container { position: relative; margin-top: 12px; background: #000; border-radius: 8px; height: 36px; overflow: hidden; border: 1px solid #333; }
+        .btn-reset { position: absolute; width: 100%; height: 100%; background: none; color: #555; z-index: 2; font-size: 10px; font-weight: bold; border: none; }
+        .hold-progress { position: absolute; top: 0; left: 0; height: 100%; width: 0%; background: var(--danger); opacity: 0.3; z-index: 1; }
 
-        #gps-bar { font-size: 10px; color: #555; margin-top: 10px; text-transform: uppercase; }
+        .calc-input { width: 100%; background: #000; border: 1px solid #333; color: var(--text); font-size: 28px; font-weight: 700; padding: 10px; border-radius: 10px; text-align: center; margin-bottom: 12px; }
+        #gps-bar { font-size: 9px; color: #444; margin-top: 8px; text-align: center; }
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
+    <div id="overlay">
+        <div class="label">Shift Auto-Detect</div>
+        <h2 id="route-type-display" style="margin: 10px 0 25px 0; font-size: 28px;">Checking...</h2>
+        <button id="start-btn" class="btn btn-start" onclick="startApp()">START SHIFT</button>
+    </div>
+
     <div class="header">
-        <h1>Milkman Logistics <span style="color:var(--accent)">PRO</span></h1>
+        <h1 id="header-title">Logistics Pro</h1>
+        <div id="date-display" style="font-size: 12px; color: var(--text-dim);"></div>
     </div>
 
-    <div class="tabs">
-        <button id="btn-town" class="tab-btn active" onclick="switchRoute('town')">TOWN RUN</button>
-        <button id="btn-village" class="tab-btn" onclick="switchRoute('village')">VILLAGE RUN</button>
-    </div>
+    <div class="prog-container"><div id="prog-fill"></div></div>
 
     <div class="card">
-        <div class="label">Calls Remaining</div>
+        <div class="label">Remaining</div>
         <div id="rem-count" class="big-val">0</div>
-        
-        <div class="label" style="margin-top:15px;">Target Destination</div>
-        <div id="next-addr" class="addr-text">Ready to Start</div>
-        
+        <div class="label" style="margin-top:10px;">Next Stop</div>
+        <div id="next-addr" class="addr-text">---</div>
         <div class="btn-group">
-            <button class="btn btn-sec" onclick="changeStop(-1)">BACK</button>
-            <button class="btn btn-skip" onclick="changeStop(1)">SKIP CALL</button>
+            <button class="btn" style="background:#2c2c2e; color:white;" onclick="changeStop(-1)">BACK</button>
+            <button class="btn" style="background:#3a1c1c; color:var(--danger);" onclick="changeStop(1)">SKIP</button>
         </div>
-        <div id="gps-bar">GPS: Standby</div>
+        <div class="hold-container">
+            <button class="btn-reset" onmousedown="startHold()" onmouseup="stopHold()" ontouchstart="startHold()" ontouchend="stopHold()">HOLD TO RESET</button>
+            <div id="hold-progress" class="hold-progress"></div>
+        </div>
+        <div id="gps-bar">GPS: STANDBY</div>
     </div>
 
-    <div class="card">
-        <div class="label">Quick Pack Calc (18)</div>
-        <input type="number" id="calc-in" class="calc-input" pattern="\d*" placeholder="Total Units" oninput="doCalc()">
-        <div class="res-box">
-            <div class="res-item"><span style="color:var(--success)" id="p-out">0</span><small>PACKS</small></div>
-            <div class="res-item"><span style="color:var(--warning)" id="l-out">0</span><small>LOOSE</small></div>
+    <div class="card" id="village-calc-card">
+        <div class="label">Pack Calculator (18)</div>
+        <input type="number" id="calc-in" class="calc-input" pattern="\d*" placeholder="0" oninput="doCalc()">
+        <div style="display: flex; justify-content: space-around; text-align: center;">
+            <div><span style="color:var(--success); font-size: 28px; font-weight: 800;" id="p-out">0</span><br><small>PACKS</small></div>
+            <div><span style="color:var(--warning); font-size: 28px; font-weight: 800;" id="l-out">0</span><br><small>LOOSE</small></div>
         </div>
     </div>
 
     <script>
         const routes = {
-            town: [
-                {addr: "Town Stop 1", lat: 52.1234, lng: -0.1234},
-                {addr: "Town Stop 2", lat: 52.1245, lng: -0.1245}
-            ],
             village: [
-                {addr: "Village Stop 1", lat: 52.2234, lng: -0.2234},
-                {addr: "Village Stop 2", lat: 52.2245, lng: -0.2245}
-            ]
+                {addr: "27 Priory Rd", lat: 52.2427, lng: 0.1916},
+                {addr: "The Old Vicarage", lat: 52.2441, lng: 0.1895},
+                {addr: "Riverside House", lat: 52.2448, lng: 0.1872},
+                {addr: "49 Station Rd", lat: 52.2714, lng: 0.1932},
+                {addr: "5 Payton Way", lat: 52.2685, lng: 0.1888},
+                {addr: "26 Burgess Rd", lat: 52.2691, lng: 0.1912},
+                {addr: "13 Way Lane", lat: 52.2708, lng: 0.1921},
+                {addr: "44 Way Lane", lat: 52.2715, lng: 0.1925},
+                {addr: "Bank Farmhouse", lat: 52.2731, lng: 0.1945},
+                {addr: "The Willows", lat: 52.2740, lng: 0.1950},
+                {addr: "71 Capper Rd", lat: 52.2722, lng: 0.1865},
+                {addr: "Little Stars Nursery", lat: 52.2718, lng: 0.1858},
+                {addr: "11 Capper Rd", lat: 52.2711, lng: 0.1868},
+                {addr: "8 Heron Walk", lat: 52.2705, lng: 0.1852},
+                {addr: "5 Providence Way", lat: 52.2698, lng: 0.1845},
+                {addr: "23 Providence Way", lat: 52.2689, lng: 0.1838},
+                {addr: "53 Denny End Rd", lat: 52.2725, lng: 0.1830},
+                {addr: "55 Denny End Rd", lat: 52.2726, lng: 0.1828},
+                {addr: "57 Denny End Rd", lat: 52.2727, lng: 0.1826},
+                {addr: "2 Cookes Field", lat: 52.2735, lng: 0.1842},
+                {addr: "Romil", lat: 52.2741, lng: 0.1848},
+                {addr: "6 Jubilee Cl", lat: 52.2720, lng: 0.1878},
+                {addr: "14 Jubilee Cl", lat: 52.2723, lng: 0.1882},
+                {addr: "3 Vicarage Cl", lat: 52.2695, lng: 0.1898},
+                {addr: "29 Vicarage Cl", lat: 52.2690, lng: 0.1905},
+                {addr: "16 Cambridge Rd", lat: 52.2675, lng: 0.1920},
+                {addr: "15 Cambridge Rd", lat: 52.2674, lng: 0.1922},
+                {addr: "49 Cambridge Rd", lat: 52.2655, lng: 0.1935},
+                {addr: "70 Cambridge Rd", lat: 52.2642, lng: 0.1942}
+            ],
+            town: []
         };
 
-        let currentRun = localStorage.getItem('milkman_run') || 'town';
-        let index = parseInt(localStorage.getItem(`index_${currentRun}`)) || 0;
+        let currentRun = "";
+        let index = 0;
+        let holdTimer;
 
-        function switchRoute(type) {
-            currentRun = type;
+        window.onload = function() {
+            const now = new Date();
+            const hour = now.getHours();
+            let bizDay = now.getDay();
+
+            // 4 PM Business Reset
+            if (hour < 16) bizDay = (bizDay === 0) ? 6 : bizDay - 1;
+
+            // Schedule: Sun, Tue, Thu = Village | Mon, Wed, Fri = Town
+            if ([0, 2, 4].includes(bizDay)) currentRun = "village";
+            else if ([1, 3, 5].includes(bizDay)) currentRun = "town";
+            else currentRun = "none";
+
+            const savedRun = localStorage.getItem('active_run');
+            if (savedRun && localStorage.getItem(`index_${savedRun}`) > 0) {
+                currentRun = savedRun;
+                document.getElementById('start-btn').innerText = "RESUME " + currentRun.toUpperCase();
+            }
+
+            if (currentRun === "none") {
+                document.getElementById('route-type-display').innerText = "OFF NIGHT";
+                document.getElementById('start-btn').style.display = 'none';
+            } else {
+                document.getElementById('route-type-display').innerText = currentRun.toUpperCase() + " RUN";
+            }
+            document.getElementById('date-display').innerText = now.toLocaleDateString();
+        };
+
+        function startApp() {
+            document.getElementById('overlay').style.display = 'none';
+            localStorage.setItem('active_run', currentRun);
             index = parseInt(localStorage.getItem(`index_${currentRun}`)) || 0;
-            localStorage.setItem('milkman_run', currentRun);
             
-            document.getElementById('btn-town').classList.toggle('active', type === 'town');
-            document.getElementById('btn-village').classList.toggle('active', type === 'village');
+            if (currentRun !== 'village') document.getElementById('village-calc-card').classList.add('hidden');
             
+            initGPS();
             updateUI();
         }
 
         function updateUI() {
             const data = routes[currentRun];
             document.getElementById('rem-count').innerText = data.length - index;
-            document.getElementById('next-addr').innerText = data[index] ? data[index].addr : "ROUTE COMPLETE";
+            document.getElementById('next-addr').innerText = data[index] ? data[index].addr : "FINISHED";
+            document.getElementById('prog-fill').style.width = (index / data.length) * 100 + "%";
+            localStorage.setItem(`index_${currentRun}`, index);
         }
 
         function changeStop(dir) {
             const data = routes[currentRun];
             index = Math.max(0, Math.min(data.length, index + dir));
-            localStorage.setItem(`index_${currentRun}`, index);
             updateUI();
+        }
+
+        function startHold() {
+            const bar = document.getElementById('hold-progress');
+            bar.style.transition = 'width 1.5s linear';
+            bar.style.width = '100%';
+            holdTimer = setTimeout(() => {
+                index = 0; updateUI(); stopHold();
+                if (navigator.vibrate) navigator.vibrate([50, 50, 150]);
+            }, 1500);
+        }
+
+        function stopHold() {
+            clearTimeout(holdTimer);
+            const bar = document.getElementById('hold-progress');
+            bar.style.transition = 'width 0.2s';
+            bar.style.width = '0%';
         }
 
         function doCalc() {
@@ -146,20 +208,29 @@
             document.getElementById('l-out').innerText = v ? v % 18 : 0;
         }
 
-        // GPS Logic
-        navigator.geolocation.watchPosition((pos) => {
-            const data = routes[currentRun];
-            document.getElementById('gps-bar').innerText = `GPS: Active (${pos.coords.accuracy.toFixed(1)}m accuracy)`;
-            if (!data[index]) return;
-
-            const d = getDist(pos.coords.latitude, pos.coords.longitude, data[index].lat, data[index].lng);
-            if (d < 30) {
-                index++;
-                localStorage.setItem(`index_${currentRun}`, index);
+        function initGPS() {
+    navigator.geolocation.watchPosition((pos) => {
+        const myLat = pos.coords.latitude;
+        const myLng = pos.coords.longitude;
+        document.getElementById('gps-bar').innerText = `ACCURACY: ${pos.coords.accuracy.toFixed(0)}M`;
+        
+        const data = routes[currentRun];
+        
+        // Scan through the remaining stops in the list
+        for (let i = index; i < data.length; i++) {
+            const d = getDist(myLat, myLng, data[i].lat, data[i].lng);
+            
+            // If we detect you are at ANY upcoming house (even if you skipped some)
+            if (d < 30) { 
+                // Set the current index to the stop AFTER the one we just detected
+                index = i + 1; 
                 updateUI();
-                if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                if (navigator.vibrate) navigator.vibrate(200);
+                break; // Exit loop since we found our new position
             }
-        }, null, { enableHighAccuracy: true });
+        }
+    }, null, { enableHighAccuracy: true });
+}
 
         function getDist(lat1, lon1, lat2, lon2) {
             const R = 6371000;
@@ -168,8 +239,6 @@
             const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
-
-        updateUI();
     </script>
 </body>
 </html>
