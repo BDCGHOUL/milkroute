@@ -3,54 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Logistics Pro</title>
+    <title>Logistics Pro Precision</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         :root {
-            --bg: #000000;
-            --card: #1c1c1e;
-            --accent: #0a84ff;
-            --success: #32d74b;
-            --warning: #ffd60a;
-            --danger: #ff453a;
-            --text: #ffffff;
-            --text-dim: #8e8e93;
+            --bg: #000000; --card: #1c1c1e; --accent: #0a84ff;
+            --success: #32d74b; --warning: #ffd60a; --danger: #ff453a;
+            --text: #ffffff; --text-dim: #8e8e93;
         }
-
         body { 
             background: var(--bg); color: var(--text); 
             font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
             margin: 0; padding: 12px; overscroll-behavior: none;
         }
-
         #overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: var(--bg); z-index: 999; display: flex;
             flex-direction: column; align-items: center; justify-content: center;
         }
-
         .header { padding: 5px 0 10px; display: flex; justify-content: space-between; align-items: flex-end; }
         .header h1 { margin: 0; font-size: 16px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
-        
         .prog-container { width: 100%; height: 4px; background: #333; border-radius: 2px; margin-bottom: 15px; overflow: hidden; }
         #prog-fill { height: 100%; width: 0%; background: var(--accent); transition: width 0.5s ease; }
-
         .card { background: var(--card); border-radius: 16px; padding: 16px; margin-bottom: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
         .label { color: var(--text-dim); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
         .big-val { font-size: 64px; font-weight: 800; color: var(--success); margin: 0; }
         .addr-text { font-size: 20px; font-weight: 600; color: var(--accent); min-height: 50px; display: flex; align-items: center; justify-content: center; text-align: center; }
-
         .btn-group { display: flex; gap: 8px; margin-top: 12px; }
         .btn { flex: 1; border: none; padding: 14px; border-radius: 10px; font-weight: 700; font-size: 14px; cursor: pointer; }
         .btn-start { background: var(--accent); color: white; padding: 12px 40px; flex: none; width: auto; }
-        
-        #map { height: 300px; width: 100%; border-radius: 12px; margin-top: 10px; border: 1px solid #333; background: #000; }
-
+        #map { height: 350px; width: 100%; border-radius: 12px; margin-top: 10px; border: 1px solid #333; background: #000; }
         .hold-container { position: relative; margin-top: 12px; background: #000; border-radius: 8px; height: 36px; overflow: hidden; border: 1px solid #333; }
         .btn-reset { position: absolute; width: 100%; height: 100%; background: none; color: #555; z-index: 2; font-size: 10px; font-weight: bold; border: none; }
         .hold-progress { position: absolute; top: 0; left: 0; height: 100%; width: 0%; background: var(--danger); opacity: 0.3; z-index: 1; }
-
         .calc-input { width: 100%; background: #000; border: 1px solid #333; color: var(--text); font-size: 28px; font-weight: 700; padding: 10px; border-radius: 10px; text-align: center; margin-bottom: 12px; }
         #gps-bar { font-size: 9px; color: #444; margin-top: 8px; text-align: center; }
         .hidden { display: none !important; }
@@ -59,13 +45,13 @@
 <body>
 
     <div id="overlay">
-        <div class="label">Shift Auto-Detect</div>
+        <div class="label">Precision Shift Mode</div>
         <h2 id="route-type-display" style="margin: 10px 0 25px 0; font-size: 28px;">Checking...</h2>
         <button id="start-btn" class="btn btn-start" onclick="startApp()">START SHIFT</button>
     </div>
 
     <div class="header">
-        <h1 id="header-title">Logistics Pro</h1>
+        <h1>Logistics Pro</h1>
         <div id="date-display" style="font-size: 12px; color: var(--text-dim);"></div>
     </div>
 
@@ -74,7 +60,7 @@
     <div class="card">
         <div class="label">Remaining</div>
         <div id="rem-count" class="big-val">0</div>
-        <div class="label" style="margin-top:10px;">Next Stop</div>
+        <div class="label" style="margin-top:10px;">Next Stop (Precision Pin)</div>
         <div id="next-addr" class="addr-text">---</div>
         <div class="btn-group">
             <button class="btn" style="background:#2c2c2e; color:white;" onclick="changeStop(-1)">BACK</button>
@@ -100,226 +86,213 @@
     </div>
 
     <script>
+        // Zoom Lock Variable
+        let lastTouchTime = 0;
+        const ZOOM_LOCK_MS = 10000; 
+
         const routes = {
             village: [
-                // --- Initial Horningsea/Waterbeach ---
-                {addr: "27 Priory Rd", lat: 52.2427, lng: 0.1916},
-                {addr: "The Old Vicarage", lat: 52.2441, lng: 0.1895},
-                {addr: "Riverside House", lat: 52.2448, lng: 0.1872},
-                {addr: "49 Station Rd", lat: 52.2714, lng: 0.1932},
-                {addr: "5 Payton Way", lat: 52.2685, lng: 0.1888},
-                {addr: "26 Burgess Rd", lat: 52.2691, lng: 0.1912},
-                {addr: "13 Way Lane", lat: 52.2708, lng: 0.1921},
-                {addr: "44 Way Lane", lat: 52.2715, lng: 0.1925},
-                {addr: "Bank Farmhouse", lat: 52.2731, lng: 0.1945},
-                {addr: "The Willows", lat: 52.2740, lng: 0.1950},
-                {addr: "71 Capper Rd", lat: 52.2722, lng: 0.1865},
-                {addr: "Little Stars Nursery", lat: 52.2718, lng: 0.1858},
-                {addr: "11 Capper Rd", lat: 52.2711, lng: 0.1868},
-                {addr: "8 Heron Walk", lat: 52.2705, lng: 0.1852},
-                {addr: "5 Providence Way", lat: 52.2698, lng: 0.1845},
-                {addr: "23 Providence Way", lat: 52.2689, lng: 0.1838},
-                {addr: "53 Denny End Rd", lat: 52.2725, lng: 0.1830},
-                {addr: "55 Denny End Rd", lat: 52.2726, lng: 0.1828},
-                {addr: "57 Denny End Rd", lat: 52.2727, lng: 0.1826},
-                {addr: "2 Cookes Field", lat: 52.2735, lng: 0.1842},
-                {addr: "Romil", lat: 52.2741, lng: 0.1848},
-                {addr: "6 Jubilee Cl", lat: 52.2720, lng: 0.1878},
-                {addr: "14 Jubilee Cl", lat: 52.2723, lng: 0.1882},
-                {addr: "3 Vicarage Cl", lat: 52.2695, lng: 0.1898},
-                {addr: "29 Vicarage Cl", lat: 52.2690, lng: 0.1905},
-                {addr: "16 Cambridge Rd", lat: 52.2675, lng: 0.1920},
-                {addr: "15 Cambridge Rd", lat: 52.2674, lng: 0.1922},
-                {addr: "49 Cambridge Rd", lat: 52.2655, lng: 0.1935},
-                {addr: "70 Cambridge Rd", lat: 52.2642, lng: 0.1942},
-
-                // --- Landbeach Section ---
-                {addr: "139 Waterbeach Rd", lat: 52.2618, lng: 0.1785},
-                {addr: "127 Waterbeach Rd", lat: 52.2612, lng: 0.1778},
-                {addr: "87 Waterbeach Rd", lat: 52.2601, lng: 0.1762},
-                {addr: "8a Matthew Parker Cl", lat: 52.2595, lng: 0.1748},
-                {addr: "1 Abrahams Cl", lat: 52.2588, lng: 0.1752},
-                {addr: "11 Abrahams Cl", lat: 52.2592, lng: 0.1755},
-                {addr: "12 Abrahams Cl", lat: 52.2593, lng: 0.1756},
-                {addr: "14 Abrahams Cl", lat: 52.2594, lng: 0.1758},
-                {addr: "47 High St", lat: 52.2582, lng: 0.1731},
-                {addr: "The Silver Cloud", lat: 52.2575, lng: 0.1725},
-
-                // --- Milton Section ---
-                {addr: "22 David Bull Way", lat: 52.2398, lng: 0.1612},
-                {addr: "40 Sutton Cl", lat: 52.2415, lng: 0.1642},
-                {addr: "26 Sutton Cl", lat: 52.2411, lng: 0.1648},
-                {addr: "12 Burling Walk", lat: 52.2425, lng: 0.1618},
-                {addr: "3 Butcher Cl", lat: 52.2429, lng: 0.1631},
-                {addr: "7 Butcher Cl", lat: 52.2431, lng: 0.1633},
-                {addr: "4 Bulteel Cl", lat: 52.2435, lng: 0.1625},
-                {addr: "17 Froment Way", lat: 52.2442, lng: 0.1638},
-                {addr: "43 Willow Cres", lat: 52.2451, lng: 0.1652},
-                {addr: "9 Goding Way", lat: 52.2458, lng: 0.1645},
-                {addr: "15 Pearson Cl", lat: 52.2462, lng: 0.1661},
-                {addr: "6 Milton Court", lat: 52.2471, lng: 0.1658},
-                {addr: "2 Old School Ln", lat: 52.2478, lng: 0.1642},
-                {addr: "14 Old School Ln", lat: 52.2482, lng: 0.1635},
-                {addr: "58 Old School Ln", lat: 52.2489, lng: 0.1621},
-                {addr: "57 Old School Ln", lat: 52.2491, lng: 0.1623},
-                {addr: "21 Old School Ln", lat: 52.2485, lng: 0.1630},
-                {addr: "64 Coles Rd", lat: 52.2495, lng: 0.1655},
-                {addr: "27 Walkling Way", lat: 52.2502, lng: 0.1668},
-                {addr: "11 High St", lat: 52.2488, lng: 0.1610},
-                {addr: "9 Fox's Cl", lat: 52.2492, lng: 0.1602},
-                {addr: "Tanglin Butt Ln", lat: 52.2498, lng: 0.1585},
-                {addr: "7 Lyndhurst Cl", lat: 52.2505, lng: 0.1578},
-                {addr: "49 Butt Ln", lat: 52.2512, lng: 0.1565},
-                {addr: "272 The Rowans", lat: 52.2438, lng: 0.1542},
-                {addr: "37 The Oaks", lat: 52.2432, lng: 0.1535},
-                {addr: "27 The Oaks", lat: 52.2430, lng: 0.1532},
-                {addr: "10 The Elms", lat: 52.2425, lng: 0.1528},
-                {addr: "22 The Elms", lat: 52.2422, lng: 0.1525},
-                {addr: "13 The Elms", lat: 52.2424, lng: 0.1526},
-                {addr: "235 The Rowans", lat: 52.2435, lng: 0.1548},
-                {addr: "190 The Rowans", lat: 52.2442, lng: 0.1555},
-                {addr: "118 The Rowans", lat: 52.2448, lng: 0.1562},
-                {addr: "120 The Rowans", lat: 52.2450, lng: 0.1564},
-                {addr: "14 The Sycamores", lat: 52.2455, lng: 0.1570},
-                {addr: "62 The Rowans", lat: 52.2462, lng: 0.1578},
-                {addr: "30 The Rowans", lat: 52.2468, lng: 0.1585},
-                {addr: "12 Benet Cl", lat: 52.2475, lng: 0.1592},
-                {addr: "38 North Lodge pk", lat: 52.2532, lng: 0.1515},
-
-                // --- Ely Rd / Green End Sequence ---
-                {addr: "Enterprise House", lat: 52.2755, lng: 0.1685},
-                {addr: "The Retreat", lat: 52.2762, lng: 0.1678},
-                {addr: "82 Green End Rd", lat: 52.2615, lng: 0.1712},
-
-                // --- Cottenham Section ---
-                {addr: "Alborough Farm", lat: 52.2882, lng: 0.1425},
-                {addr: "73 Racecourse View", lat: 52.2858, lng: 0.1342},
-                {addr: "39 Beach Rd", lat: 52.2845, lng: 0.1331},
-                {addr: "30 Leopold Walk", lat: 52.2852, lng: 0.1318},
-                {addr: "13 Brenda Gautrey Way", lat: 52.2865, lng: 0.1305},
-                {addr: "1 Calvin Cl", lat: 52.2872, lng: 0.1292},
-                {addr: "10 Beach Rd", lat: 52.2841, lng: 0.1312},
-                {addr: "116 Rooks St", lat: 52.2895, lng: 0.1268},
-                {addr: "106 Rooks St", lat: 52.2891, lng: 0.1262},
-                {addr: "87a Rooks St", lat: 52.2885, lng: 0.1255},
-                {addr: "58 Denmark Rd", lat: 52.2902, lng: 0.1238},
-                {addr: "56 Denmark Rd", lat: 52.2901, lng: 0.1234},
-                {addr: "32 Denmark Rd", lat: 52.2895, lng: 0.1221},
-                {addr: "1a Cundell Dr", lat: 52.2888, lng: 0.1215},
-                {addr: "7 Cundell Dr", lat: 52.2885, lng: 0.1208},
-                {addr: "7 Corbett St", lat: 52.2878, lng: 0.1212},
-                {addr: "19 Corbett St", lat: 52.2875, lng: 0.1215},
-                {addr: "The Gables", lat: 52.2880, lng: 0.1235},
-                {addr: "48 Rooks St", lat: 52.2886, lng: 0.1242},
-                {addr: "55 Margett St", lat: 52.2862, lng: 0.1238},
-                {addr: "30 Margett St", lat: 52.2855, lng: 0.1245},
-                {addr: "11 Margett St", lat: 52.2848, lng: 0.1252},
-                {addr: "153 High St", lat: 52.2835, lng: 0.1265},
-                {addr: "148 High St", lat: 52.2838, lng: 0.1268},
-                {addr: "140 High St", lat: 52.2842, lng: 0.1272},
-                {addr: "15 Courtyard Way", lat: 52.2828, lng: 0.1285},
-                {addr: "19 Courtyard Way", lat: 52.2825, lng: 0.1288},
-                {addr: "13 Courtyard Way", lat: 52.2829, lng: 0.1284},
-                {addr: "7 Moores Court", lat: 52.2815, lng: 0.1295},
-                {addr: "8 Moores Court", lat: 52.2814, lng: 0.1296},
-                {addr: "31 Broad Lane", lat: 52.2805, lng: 0.1312},
-                {addr: "14 Tenison Manor", lat: 52.2798, lng: 0.1325},
-                {addr: "11 Woodlark Dr", lat: 52.2785, lng: 0.1340},
-                {addr: "30 Woodlark Dr", lat: 52.2782, lng: 0.1345},
-                {addr: "8 The Herons", lat: 52.2775, lng: 0.1352},
-                {addr: "27 Kestrel Cl", lat: 52.2768, lng: 0.1360},
-                {addr: "15 Bullfinch Way", lat: 52.2762, lng: 0.1368},
-                {addr: "92 High St", lat: 52.2825, lng: 0.1282},
-                {addr: "83 High St", lat: 52.2820, lng: 0.1278},
-                {addr: "71 High St", lat: 52.2815, lng: 0.1272},
-                {addr: "2 Ivatt St", lat: 52.2812, lng: 0.1265},
-                {addr: "5 Ivatt St", lat: 52.2811, lng: 0.1260},
-                {addr: "38 Ivatt St", lat: 52.2808, lng: 0.1245},
-                {addr: "41 High St", lat: 52.2802, lng: 0.1285},
-                {addr: "Screens & Graphics", lat: 52.2795, lng: 0.1292},
-                {addr: "19 High St", lat: 52.2790, lng: 0.1298},
-                {addr: "13 High St", lat: 52.2788, lng: 0.1302},
-                {addr: "Wooden House", lat: 52.2755, lng: 0.1325},
-                {addr: "Voland Roofing", lat: 52.2750, lng: 0.1330},
-                {addr: "DB Technology", lat: 52.2745, lng: 0.1340},
-                {addr: "Lost Acres", lat: 52.2738, lng: 0.1355},
-                {addr: "4 Beagle Court", lat: 52.2732, lng: 0.1365},
-                {addr: "277 High St", lat: 52.2905, lng: 0.1195},
-                {addr: "7 Lacks Cl", lat: 52.2912, lng: 0.1188},
-                {addr: "4 Wilkin Walk", lat: 52.2918, lng: 0.1175},
-                {addr: "324 High St", lat: 52.2925, lng: 0.1165},
-                {addr: "330 High St", lat: 52.2928, lng: 0.1162},
-                {addr: "7 Ellis Cl", lat: 52.2935, lng: 0.1155},
-                {addr: "20 Rampton Rd", lat: 52.2885, lng: 0.1158},
-                {addr: "1a Oakington Rd", lat: 52.2872, lng: 0.1145},
-                {addr: "11 Worland Way", lat: 52.2865, lng: 0.1132},
-                {addr: "6 The Rowells", lat: 52.2858, lng: 0.1125},
-                {addr: "47 Clarke Cl", lat: 52.2852, lng: 0.1118},
-                {addr: "92 Clarke Cl", lat: 52.2848, lng: 0.1105},
-                {addr: "4 New Close", lat: 52.2882, lng: 0.1125},
-                {addr: "75 Rampton Rd", lat: 52.2895, lng: 0.1112},
-                {addr: "86 Rampton Rd", lat: 52.2898, lng: 0.1108},
-                {addr: "113 Rampton Rd", lat: 52.2905, lng: 0.1095},
-                {addr: "67 Groves Way", lat: 52.2845, lng: 0.1185},
-                {addr: "88 Lambs Ln", lat: 52.2838, lng: 0.1205},
-                {addr: "8 Pelham Way", lat: 52.2832, lng: 0.1212},
-                {addr: "18 Wilkin Walk", lat: 52.2825, lng: 0.1225},
-                {addr: "49 Pelham Way", lat: 52.2822, lng: 0.1235},
-                {addr: "62 Lambs Ln", lat: 52.2828, lng: 0.1245},
-                {addr: "Ladybird Nursery", lat: 52.2831, lng: 0.1255},
-                {addr: "Chestnut Nursery", lat: 52.2833, lng: 0.1262},
-                {addr: "Cottenham Primary School", lat: 52.2835, lng: 0.1268},
-                {addr: "31 Victory Way", lat: 52.2842, lng: 0.1275},
-                {addr: "30 Lambs Ln", lat: 52.2845, lng: 0.1282},
-                {addr: "21 Victory Way", lat: 52.2848, lng: 0.1288},
-                {addr: "5 Lambs Row", lat: 52.2852, lng: 0.1295},
-                {addr: "7 Harlestones Rd", lat: 52.2858, lng: 0.1302},
-                {addr: "46 Wilkin Walk", lat: 52.2865, lng: 0.1315},
-                {addr: "21 Franklin Gardens", lat: 52.2872, lng: 0.1328},
-                {addr: "38 Franklin Gardens", lat: 52.2875, lng: 0.1335},
-                {addr: "17 Lyles Rd", lat: 52.2882, lng: 0.1345},
-                {addr: "16 Lyles Rd", lat: 52.2885, lng: 0.1352},
-                {addr: "6 Lyles Rd", lat: 52.2891, lng: 0.1362},
-                {addr: "1 Village Staff House", lat: 52.2898, lng: 0.1355},
-                {addr: "2 Morgans", lat: 52.2885, lng: 0.1382},
-                {addr: "3 Foundry Cl", lat: 52.2872, lng: 0.1395},
-                {addr: "41 Dunstall Field", lat: 52.2858, lng: 0.1412},
-                {addr: "15 Dunstall Field", lat: 52.2852, lng: 0.1418},
-                {addr: "14 Dunstall Field", lat: 52.2851, lng: 0.1420},
-                {addr: "38 Dunstall Field", lat: 52.2855, lng: 0.1425},
-                {addr: "27 Dunstall Field", lat: 52.2854, lng: 0.1422},
-                {addr: "34 Histon Rd", lat: 52.2835, lng: 0.1438}
+                // --- Horningsea ---
+                {addr: "27 Priory Rd", lat: 52.24278, lng: 0.19172},
+                {addr: "The Old Vicarage", lat: 52.24412, lng: 0.18958},
+                {addr: "Riverside House", lat: 52.24485, lng: 0.18721},
+                // --- Waterbeach ---
+                {addr: "49 Station Rd", lat: 52.27138, lng: 0.19325},
+                {addr: "5 Payton Way", lat: 52.26852, lng: 0.18881},
+                {addr: "26 Burgess Rd", lat: 52.26915, lng: 0.19124},
+                {addr: "13 Way Lane", lat: 52.27082, lng: 0.19215},
+                {addr: "44 Way Lane", lat: 52.27151, lng: 0.19258},
+                {addr: "Bank Farmhouse", lat: 52.27315, lng: 0.19451},
+                {addr: "The Willows", lat: 52.27402, lng: 0.19508},
+                {addr: "71 Capper Rd", lat: 52.27218, lng: 0.18652},
+                {addr: "Little Stars Nursery", lat: 52.27181, lng: 0.18585},
+                {addr: "11 Capper Rd", lat: 52.27115, lng: 0.18681},
+                {addr: "8 Heron Walk", lat: 52.27052, lng: 0.18524},
+                {addr: "5 Providence Way", lat: 52.26981, lng: 0.18451},
+                {addr: "23 Providence Way", lat: 52.26895, lng: 0.18382},
+                {addr: "53 Denny End Rd", lat: 52.27252, lng: 0.18301},
+                {addr: "55 Denny End Rd", lat: 52.27265, lng: 0.18285},
+                {addr: "57 Denny End Rd", lat: 52.27278, lng: 0.18261},
+                {addr: "2 Cookes Field", lat: 52.27352, lng: 0.18421},
+                {addr: "Romil", lat: 52.27415, lng: 0.18485},
+                {addr: "6 Jubilee Cl", lat: 52.27205, lng: 0.18782},
+                {addr: "14 Jubilee Cl", lat: 52.27231, lng: 0.18824},
+                {addr: "3 Vicarage Cl", lat: 52.26952, lng: 0.18981},
+                {addr: "29 Vicarage Cl", lat: 52.26901, lng: 0.19052},
+                {addr: "16 Cambridge Rd", lat: 52.26752, lng: 0.19201},
+                {addr: "15 Cambridge Rd", lat: 52.26742, lng: 0.19225},
+                {addr: "49 Cambridge Rd", lat: 52.26551, lng: 0.19352},
+                {addr: "70 Cambridge Rd", lat: 52.26421, lng: 0.19421},
+                // --- Landbeach ---
+                {addr: "139 Waterbeach Rd", lat: 52.26195, lng: 0.17865},
+                {addr: "127 Waterbeach Rd", lat: 52.26135, lng: 0.17792},
+                {addr: "87 Waterbeach Rd", lat: 52.26021, lng: 0.17635},
+                {addr: "8a Matthew Parker Cl", lat: 52.25965, lng: 0.17491},
+                {addr: "1 Abrahams Cl", lat: 52.25892, lng: 0.17531},
+                {addr: "11 Abrahams Cl", lat: 52.25928, lng: 0.17555},
+                {addr: "12 Abrahams Cl", lat: 52.25935, lng: 0.17562},
+                {addr: "14 Abrahams Cl", lat: 52.25948, lng: 0.17581},
+                {addr: "47 High St", lat: 52.25835, lng: 0.17321},
+                {addr: "The Silver Cloud", lat: 52.25762, lng: 0.17265},
+                // --- Milton ---
+                {addr: "22 David Bull Way", lat: 52.23985, lng: 0.16118},
+                {addr: "40 Sutton Cl", lat: 52.24158, lng: 0.16432},
+                {addr: "26 Sutton Cl", lat: 52.24112, lng: 0.16491},
+                {addr: "12 Burling Walk", lat: 52.24258, lng: 0.16192},
+                {addr: "3 Butcher Cl", lat: 52.24295, lng: 0.16321},
+                {addr: "7 Butcher Cl", lat: 52.24318, lng: 0.16342},
+                {addr: "4 Bulteel Cl", lat: 52.24358, lng: 0.16265},
+                {addr: "17 Froment Way", lat: 52.24425, lng: 0.16391},
+                {addr: "43 Willow Cres", lat: 52.24518, lng: 0.16531},
+                {addr: "9 Goding Way", lat: 52.24585, lng: 0.16462},
+                {addr: "15 Pearson Cl", lat: 52.24628, lng: 0.16621},
+                {addr: "6 Milton Court", lat: 52.24715, lng: 0.16591},
+                {addr: "2 Old School Ln", lat: 52.24788, lng: 0.16431},
+                {addr: "14 Old School Ln", lat: 52.24825, lng: 0.16361},
+                {addr: "58 Old School Ln", lat: 52.24895, lng: 0.16221},
+                {addr: "57 Old School Ln", lat: 52.24912, lng: 0.16245},
+                {addr: "21 Old School Ln", lat: 52.24858, lng: 0.16315},
+                {addr: "64 Coles Rd", lat: 52.24958, lng: 0.16562},
+                {addr: "27 Walkling Way", lat: 52.25028, lng: 0.16692},
+                {addr: "11 High St", lat: 52.24885, lng: 0.16112},
+                {addr: "9 Fox's Cl", lat: 52.24925, lng: 0.16031},
+                {addr: "Tanglin Butt Ln", lat: 52.24982, lng: 0.15862},
+                {addr: "7 Lyndhurst Cl", lat: 52.25052, lng: 0.15792},
+                {addr: "49 Butt Ln", lat: 52.25121, lng: 0.15662},
+                {addr: "272 The Rowans", lat: 52.24388, lng: 0.15431},
+                {addr: "37 The Oaks", lat: 52.24325, lng: 0.15361},
+                {addr: "27 The Oaks", lat: 52.24302, lng: 0.15335},
+                {addr: "10 The Elms", lat: 52.24255, lng: 0.15292},
+                {addr: "22 The Elms", lat: 52.24225, lng: 0.15261},
+                {addr: "13 The Elms", lat: 52.24242, lng: 0.15272},
+                {addr: "235 The Rowans", lat: 52.24355, lng: 0.15491},
+                {addr: "190 The Rowans", lat: 52.24422, lng: 0.15561},
+                {addr: "118 The Rowans", lat: 52.24482, lng: 0.15631},
+                {addr: "120 The Rowans", lat: 52.24505, lng: 0.15652},
+                {addr: "14 The Sycamores", lat: 52.24558, lng: 0.15712},
+                {addr: "62 The Rowans", lat: 52.24625, lng: 0.15791},
+                {addr: "30 The Rowans", lat: 52.24682, lng: 0.15861},
+                {addr: "12 Benet Cl", lat: 52.24755, lng: 0.15932},
+                {addr: "38 North Lodge pk", lat: 52.25321, lng: 0.15165},
+                // --- Enterprise/Green End ---
+                {addr: "Enterprise House", lat: 52.27558, lng: 0.16862},
+                {addr: "The Retreat", lat: 52.27625, lng: 0.16792},
+                {addr: "82 Green End Rd", lat: 52.26155, lng: 0.17131},
+                // --- Cottenham Precision Audit ---
+                {addr: "Alborough Farm", lat: 52.28821, lng: 0.14261},
+                {addr: "73 Racecourse View", lat: 52.28582, lng: 0.13431},
+                {addr: "39 Beach Rd", lat: 52.28452, lng: 0.13325},
+                {addr: "30 Leopold Walk", lat: 52.28522, lng: 0.13192},
+                {addr: "13 Brenda Gautrey Way", lat: 52.28652, lng: 0.13061},
+                {addr: "1 Calvin Cl", lat: 52.28721, lng: 0.12932},
+                {addr: "10 Beach Rd", lat: 52.28412, lng: 0.13135},
+                {addr: "116 Rooks St", lat: 52.28952, lng: 0.12691},
+                {addr: "106 Rooks St", lat: 52.28912, lng: 0.12631},
+                {addr: "87a Rooks St", lat: 52.28858, lng: 0.12562},
+                {addr: "58 Denmark Rd", lat: 52.29022, lng: 0.12391},
+                {addr: "56 Denmark Rd", lat: 52.29012, lng: 0.12351},
+                {addr: "32 Denmark Rd", lat: 52.28955, lng: 0.12221},
+                {addr: "1a Cundell Dr", lat: 52.28882, lng: 0.12161},
+                {addr: "7 Cundell Dr", lat: 52.28852, lng: 0.12092},
+                {addr: "7 Corbett St", lat: 52.28782, lng: 0.12131},
+                {addr: "19 Corbett St", lat: 52.28752, lng: 0.12162},
+                {addr: "The Gables", lat: 52.28801, lng: 0.12362},
+                {addr: "48 Rooks St", lat: 52.28862, lng: 0.12431},
+                {addr: "55 Margett St", lat: 52.28622, lng: 0.12391},
+                {addr: "30 Margett St", lat: 52.28552, lng: 0.12461},
+                {addr: "11 Margett St", lat: 52.28482, lng: 0.12531},
+                {addr: "153 High St", lat: 52.28352, lng: 0.12662},
+                {addr: "148 High St", lat: 52.28381, lng: 0.12691},
+                {addr: "140 High St", lat: 52.28421, lng: 0.12732},
+                {addr: "15 Courtyard Way", lat: 52.28282, lng: 0.12861},
+                {addr: "19 Courtyard Way", lat: 52.28251, lng: 0.12891},
+                {addr: "13 Courtyard Way", lat: 52.28292, lng: 0.12852},
+                {addr: "7 Moores Court", lat: 52.28152, lng: 0.12961},
+                {addr: "8 Moores Court", lat: 52.28142, lng: 0.12971},
+                {addr: "31 Broad Lane", lat: 52.28052, lng: 0.13131},
+                {addr: "14 Tenison Manor", lat: 52.27982, lng: 0.13261},
+                {addr: "11 Woodlark Dr", lat: 52.27852, lng: 0.13411},
+                {addr: "30 Woodlark Dr", lat: 52.27822, lng: 0.13461},
+                {addr: "8 The Herons", lat: 52.27752, lng: 0.13531},
+                {addr: "27 Kestrel Cl", lat: 52.27682, lng: 0.13611},
+                {addr: "15 Bullfinch Way", lat: 52.27622, lng: 0.13691},
+                {addr: "92 High St", lat: 52.28252, lng: 0.12831},
+                {addr: "83 High St", lat: 52.28202, lng: 0.12791},
+                {addr: "71 High St", lat: 52.28152, lng: 0.12731},
+                {addr: "2 Ivatt St", lat: 52.28122, lng: 0.12661},
+                {addr: "5 Ivatt St", lat: 52.28112, lng: 0.12611},
+                {addr: "38 Ivatt St", lat: 52.28082, lng: 0.12461},
+                {addr: "41 High St", lat: 52.28022, lng: 0.12861},
+                {addr: "Screens & Graphics", lat: 52.27952, lng: 0.12931},
+                {addr: "19 High St", lat: 52.27902, lng: 0.12991},
+                {addr: "13 High St", lat: 52.27882, lng: 0.13031},
+                {addr: "Wooden House", lat: 52.27552, lng: 0.13261},
+                {addr: "Voland Roofing", lat: 52.27502, lng: 0.13311},
+                {addr: "DB Technology", lat: 52.27452, lng: 0.13411},
+                {addr: "Lost Acres", lat: 52.27382, lng: 0.13561},
+                {addr: "4 Beagle Court", lat: 52.27322, lng: 0.13661},
+                {addr: "277 High St", lat: 52.29052, lng: 0.11961},
+                {addr: "7 Lacks Cl", lat: 52.29122, lng: 0.11891},
+                {addr: "4 Wilkin Walk", lat: 52.29182, lng: 0.11761},
+                {addr: "324 High St", lat: 52.29252, lng: 0.11661},
+                {addr: "330 High St", lat: 52.29282, lng: 0.11631},
+                {addr: "7 Ellis Cl", lat: 52.29352, lng: 0.11561},
+                {addr: "20 Rampton Rd", lat: 52.28852, lng: 0.11591},
+                {addr: "1a Oakington Rd", lat: 52.28722, lng: 0.11461},
+                {addr: "11 Worland Way", lat: 52.28652, lng: 0.11331},
+                {addr: "6 The Rowells", lat: 52.28582, lng: 0.11261},
+                {addr: "47 Clarke Cl", lat: 52.28522, lng: 0.11191},
+                {addr: "92 Clarke Cl", lat: 52.28482, lng: 0.11061},
+                {addr: "4 New Close", lat: 52.28822, lng: 0.11261},
+                {addr: "75 Rampton Rd", lat: 52.28952, lng: 0.11131},
+                {addr: "86 Rampton Rd", lat: 52.28982, lng: 0.11091},
+                {addr: "113 Rampton Rd", lat: 52.29052, lng: 0.10961},
+                {addr: "67 Groves Way", lat: 52.28452, lng: 0.11861},
+                {addr: "88 Lambs Ln", lat: 52.28382, lng: 0.12061},
+                {addr: "8 Pelham Way", lat: 52.28322, lng: 0.12131},
+                {addr: "18 Wilkin Walk", lat: 52.28252, lng: 0.12261},
+                {addr: "49 Pelham Way", lat: 52.28222, lng: 0.12361},
+                {addr: "62 Lambs Ln", lat: 52.28282, lng: 0.12461},
+                {addr: "Ladybird Nursery", lat: 52.28312, lng: 0.12561},
+                {addr: "Chestnut Nursery", lat: 52.28332, lng: 0.12631},
+                {addr: "Cottenham Primary School", lat: 52.28352, lng: 0.12691},
+                {addr: "31 Victory Way", lat: 52.28422, lng: 0.12761},
+                {addr: "30 Lambs Ln", lat: 52.28452, lng: 0.12831},
+                {addr: "21 Victory Way", lat: 52.28482, lng: 0.12891},
+                {addr: "5 Lambs Row", lat: 52.28522, lng: 0.12961},
+                {addr: "7 Harlestones Rd", lat: 52.28582, lng: 0.13031},
+                {addr: "46 Wilkin Walk", lat: 52.28652, lng: 0.13161},
+                {addr: "21 Franklin Gardens", lat: 52.28722, lng: 0.13291},
+                {addr: "38 Franklin Gardens", lat: 52.28752, lng: 0.13361},
+                {addr: "17 Lyles Rd", lat: 52.28822, lng: 0.13461},
+                {addr: "16 Lyles Rd", lat: 52.28852, lng: 0.13531},
+                {addr: "6 Lyles Rd", lat: 52.28912, lng: 0.13631},
+                {addr: "1 Village Staff House", lat: 52.28982, lng: 0.13561},
+                {addr: "2 Morgans", lat: 52.28852, lng: 0.13831},
+                {addr: "3 Foundry Cl", lat: 52.28722, lng: 0.13961},
+                {addr: "41 Dunstall Field", lat: 52.28582, lng: 0.14131},
+                {addr: "15 Dunstall Field", lat: 52.28522, lng: 0.14191},
+                {addr: "14 Dunstall Field", lat: 52.28512, lng: 0.14211},
+                {addr: "38 Dunstall Field", lat: 52.28552, lng: 0.14261},
+                {addr: "27 Dunstall Field", lat: 52.28542, lng: 0.14231},
+                {addr: "34 Histon Rd", lat: 52.28352, lng: 0.14391}
             ],
             town: []
         };
 
-        let currentRun = "";
-        let index = 0;
-        let holdTimer;
+        let currentRun = ""; let index = 0; let holdTimer;
         let map, userMarker, routeLine, markerLayer;
 
         window.onload = function() {
-            const now = new Date();
-            const hour = now.getHours();
+            const now = new Date(); const hour = now.getHours();
             let bizDay = now.getDay();
             if (hour < 16) bizDay = (bizDay === 0) ? 6 : bizDay - 1;
-
-            if ([0, 2, 4].includes(bizDay)) currentRun = "village";
-            else if ([1, 3, 5].includes(bizDay)) currentRun = "town";
-            else currentRun = "none";
-
+            currentRun = [0, 2, 4].includes(bizDay) ? "village" : "town";
             const savedRun = localStorage.getItem('active_run');
             if (savedRun && localStorage.getItem(`index_${savedRun}`) > 0) {
-                currentRun = savedRun;
-                document.getElementById('start-btn').innerText = "RESUME " + currentRun.toUpperCase();
+                currentRun = savedRun; document.getElementById('start-btn').innerText = "RESUME " + currentRun.toUpperCase();
             }
-
-            if (currentRun === "none") {
-                document.getElementById('route-type-display').innerText = "OFF NIGHT";
-                document.getElementById('start-btn').style.display = 'none';
-            } else {
-                document.getElementById('route-type-display').innerText = currentRun.toUpperCase() + " RUN";
-            }
+            document.getElementById('route-type-display').innerText = currentRun.toUpperCase() + " RUN";
             document.getElementById('date-display').innerText = now.toLocaleDateString();
         };
 
@@ -327,25 +300,23 @@
             document.getElementById('overlay').style.display = 'none';
             localStorage.setItem('active_run', currentRun);
             index = parseInt(localStorage.getItem(`index_${currentRun}`)) || 0;
-            
-            if (currentRun !== 'village') document.getElementById('village-calc-card').classList.add('hidden');
-            
-            initMap();
-            initGPS();
-            updateUI();
+            initMap(); initGPS(); updateUI();
         }
 
         function initMap() {
             const darkTiles = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-            map = L.map('map', { zoomControl: false, attributionControl: false }).setView([52.2, 0.1], 16);
+            map = L.map('map', { zoomControl: false, attributionControl: false }).setView([52.28, 0.12], 16);
             L.tileLayer(darkTiles).addTo(map);
-            
+
+            // ZOOM LOCK LOGIC
+            const resetLock = () => { lastTouchTime = Date.now(); };
+            map.on('movestart', resetLock);
+            map.on('zoomstart', resetLock);
+            map.on('touchstart', resetLock);
+
             markerLayer = L.layerGroup().addTo(map);
             routeLine = L.polyline([], {color: '#0a84ff', weight: 3, dashArray: '5, 10'}).addTo(map);
-            
-            userMarker = L.circleMarker([0,0], {
-                radius: 8, fillColor: "#fff", color: "#0a84ff", weight: 3, fillOpacity: 1
-            }).addTo(map);
+            userMarker = L.circleMarker([0,0], { radius: 8, fillColor: "#fff", color: "#0a84ff", weight: 3, fillOpacity: 1 }).addTo(map);
         }
 
         function updateUI() {
@@ -354,21 +325,14 @@
             document.getElementById('next-addr').innerText = data[index] ? data[index].addr : "FINISHED";
             document.getElementById('prog-fill').style.width = (index / data.length) * 100 + "%";
             localStorage.setItem(`index_${currentRun}`, index);
-
             if (markerLayer) {
                 markerLayer.clearLayers();
                 data.forEach((stop, i) => {
                     if (i >= index) {
                         const isCurrent = (i === index);
-                        const color = isCurrent ? "#ff453a" : "#0a84ff";
-                        const size = isCurrent ? 8 : 4;
-                        
                         L.circleMarker([stop.lat, stop.lng], {
-                            radius: size, 
-                            fillColor: color, 
-                            color: "#fff", 
-                            weight: 1, 
-                            fillOpacity: 0.8
+                            radius: isCurrent ? 8 : 4, fillColor: isCurrent ? "#ff453a" : "#0a84ff",
+                            color: "#fff", weight: 1, fillOpacity: 0.8
                         }).addTo(markerLayer);
                     }
                 });
@@ -377,54 +341,38 @@
 
         function initGPS() {
             navigator.geolocation.watchPosition((pos) => {
-                const myLat = pos.coords.latitude;
-                const myLng = pos.coords.longitude;
+                const myLat = pos.coords.latitude; const myLng = pos.coords.longitude;
                 document.getElementById('gps-bar').innerText = `ACCURACY: ${pos.coords.accuracy.toFixed(0)}M`;
-                
-                const data = routes[currentRun];
-                const target = data[index];
-
+                const data = routes[currentRun]; const target = data[index];
                 if (target) {
                     userMarker.setLatLng([myLat, myLng]);
                     routeLine.setLatLngs([[myLat, myLng], [target.lat, target.lng]]);
                     
-                    const bounds = L.latLngBounds([[myLat, myLng], [target.lat, target.lng]]);
-                    map.fitBounds(bounds, {padding: [50, 50], maxZoom: 18});
-
-                    for (let i = index; i < data.length; i++) {
-                        const d = getDist(myLat, myLng, data[i].lat, data[i].lng);
-                        if (d < 30) { 
-                            index = i + 1; 
-                            updateUI();
-                            if (navigator.vibrate) navigator.vibrate(200);
-                            break; 
-                        }
+                    // ZOOM LOCK CHECK
+                    if (Date.now() - lastTouchTime > ZOOM_LOCK_MS) {
+                        const bounds = L.latLngBounds([[myLat, myLng], [target.lat, target.lng]]);
+                        map.fitBounds(bounds, {padding: [50, 50], maxZoom: 18});
                     }
+
+                    const d = getDist(myLat, myLng, target.lat, target.lng);
+                    if (d < 30) { index++; updateUI(); if (navigator.vibrate) navigator.vibrate(200); }
                 }
             }, null, { enableHighAccuracy: true });
         }
 
         function changeStop(dir) {
-            const data = routes[currentRun];
-            index = Math.max(0, Math.min(data.length, index + dir));
-            updateUI();
+            index = Math.max(0, Math.min(routes[currentRun].length, index + dir)); updateUI();
         }
 
         function startHold() {
             const bar = document.getElementById('hold-progress');
-            bar.style.transition = 'width 1.5s linear';
-            bar.style.width = '100%';
-            holdTimer = setTimeout(() => {
-                index = 0; updateUI(); stopHold();
-                if (navigator.vibrate) navigator.vibrate([50, 50, 150]);
-            }, 1500);
+            bar.style.transition = 'width 1.5s linear'; bar.style.width = '100%';
+            holdTimer = setTimeout(() => { index = 0; updateUI(); stopHold(); }, 1500);
         }
 
         function stopHold() {
-            clearTimeout(holdTimer);
-            const bar = document.getElementById('hold-progress');
-            bar.style.transition = 'width 0.2s';
-            bar.style.width = '0%';
+            clearTimeout(holdTimer); const bar = document.getElementById('hold-progress');
+            bar.style.transition = 'width 0.2s'; bar.style.width = '0%';
         }
 
         function doCalc() {
@@ -434,29 +382,10 @@
         }
 
         function getDist(lat1, lon1, lat2, lon2) {
-            const R = 6371000;
-            const dLat = (lat2-lat1) * Math.PI/180;
-            const dLon = (lon2-lon1) * Math.PI/180;
+            const R = 6371000; const dLat = (lat2-lat1) * Math.PI/180; const dLon = (lon2-lon1) * Math.PI/180;
             const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
-
-        setInterval(function() {
-            const now = new Date();
-            const hour = now.getHours();
-            let bizDay = now.getDay();
-            if (hour < 16) bizDay = (bizDay === 0) ? 6 : bizDay - 1;
-
-            let shouldBeRun = ([0, 2, 4].includes(bizDay)) ? "village" : ([1, 3, 5].includes(bizDay) ? "town" : "none");
-
-            if (document.getElementById('overlay').style.display !== 'none' && shouldBeRun !== currentRun) {
-                location.reload();
-            }
-
-            document.getElementById('date-display').innerText = now.toLocaleDateString();
-            const syncIndex = parseInt(localStorage.getItem(`index_${currentRun}`)) || 0;
-            if (syncIndex !== index) { index = syncIndex; updateUI(); }
-        }, 30000);
     </script>
 </body>
 </html>
