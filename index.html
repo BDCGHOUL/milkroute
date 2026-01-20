@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Logistics Pro - Smart Jump 10m</title>
+    <title>Logistics Pro - 3D Follow</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -43,17 +43,35 @@
         .btn-group { display: flex; gap: 8px; }
         .btn-nav { flex: 1; border: none; padding: 18px; border-radius: 10px; font-weight: 700; font-size: 15px; }
 
-        #map-container { position: relative; margin-top: 10px; }
-        #map { height: 400px; width: 100%; border-radius: 10px; border: 1px solid #333; }
+        #map-container { position: relative; margin-top: 10px; perspective: 1000px; overflow: hidden; border-radius: 10px; }
+        #map { 
+            height: 400px; width: 100%; border: 1px solid #333;
+            transition: transform 0.4s ease-out;
+        }
         
+        .map-3d {
+            transform: rotateX(50deg) scale(1.3); /* Scale up to hide edges during rotation */
+            height: 550px !important;
+            margin-top: -75px;
+        }
+
         .btn-reset-mini {
             position: absolute; top: 10px; left: 10px; z-index: 1000;
-            width: 40px; height: 40px; background: rgba(28, 28, 30, 0.8);
+            width: 40px; height: 40px; background: rgba(28, 28, 30, 0.9);
             border: 2px solid var(--danger); border-radius: 8px;
             display: flex; align-items: center; justify-content: center;
             color: var(--danger); font-size: 10px; font-weight: 800;
-            overflow: hidden; touch-action: none; -webkit-user-select: none;
+            overflow: hidden; touch-action: none;
         }
+
+        #go-btn {
+            position: absolute; top: 10px; right: 10px; z-index: 1000;
+            background: var(--success); color: black; border: none;
+            padding: 10px 20px; border-radius: 25px; font-weight: 900;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            letter-spacing: 1px;
+        }
+
         #reset-fill {
             position: absolute; bottom: 0; left: 0; width: 100%; height: 0%;
             background: rgba(255, 69, 58, 0.4); pointer-events: none;
@@ -109,6 +127,7 @@
                 <div id="reset-fill"></div>
                 <span style="z-index:1001">RST</span>
             </div>
+            <button id="go-btn" onclick="toggle3D()">GO</button>
             <div id="map"></div>
         </div>
         
@@ -180,28 +199,28 @@
             {addr: "148 High St", lat: 52.29048, lng: 0.12648}, {addr: "140 High St", lat: 52.29085, lng: 0.12686},
             {addr: "15 Courtyard Way", lat: 52.29334, lng: 0.12544}, {addr: "19 Courtyard Way", lat: 52.29343, lng: 0.12564},
             {addr: "13 Courtyard Way", lat: 52.29331, lng: 0.12560}, {addr: "7 Moores Court", lat: 52.29244, lng: 0.12589},
-            {addr: "8 Moores Court", lat: 52.29243, lng: 0.12582}, {addr: "31 Broad Lane", lat: 52.28052, lng: 0.13131},
-            {addr: "14 Tenison Manor", lat: 52.27982, lng: 0.13261}, {addr: "11 Woodlark Dr", lat: 52.27852, lng: 0.13411},
-            {addr: "30 Woodlark Dr", lat: 52.27822, lng: 0.13461}, {addr: "8 The Herons", lat: 52.27752, lng: 0.13531},
-            {addr: "27 Kestrel Cl", lat: 52.27682, lng: 0.13611}, {addr: "15 Bullfinch Way", lat: 52.27622, lng: 0.13691},
-            {addr: "92 High St", lat: 52.28252, lng: 0.12831}, {addr: "83 High St", lat: 52.28202, lng: 0.12791},
-            {addr: "71 High St", lat: 52.28152, lng: 0.12731}, {addr: "2 Ivatt St", lat: 52.28122, lng: 0.12661},
-            {addr: "5 Ivatt St", lat: 52.28112, lng: 0.12611}, {addr: "38 Ivatt St", lat: 52.28082, lng: 0.12461},
-            {addr: "41 High St", lat: 52.28022, lng: 0.12861}, {addr: "Screens & Graphics", lat: 52.27952, lng: 0.12931},
-            {addr: "19 High St", lat: 52.27902, lng: 0.12991}, {addr: "13 High St", lat: 52.27882, lng: 0.13031},
-            {addr: "Wooden House", lat: 52.27552, lng: 0.13261}, {addr: "Voland Roofing", lat: 52.27502, lng: 0.13311},
-            {addr: "DB Technology", lat: 52.27452, lng: 0.13411}, {addr: "Lost Acres", lat: 52.27382, lng: 0.13561},
-            {addr: "4 Beagle Court", lat: 52.27322, lng: 0.13661}, {addr: "277 High St", lat: 52.29052, lng: 0.11961},
-            {addr: "7 Lacks Cl", lat: 52.29122, lng: 0.11891}, {addr: "4 Wilkin Walk", lat: 52.29182, lng: 0.11761},
-            {addr: "324 High St", lat: 52.29252, lng: 0.11661}, {addr: "330 High St", lat: 52.29282, lng: 0.11631},
-            {addr: "7 Ellis Cl", lat: 52.29352, lng: 0.11561}, {addr: "20 Rampton Rd", lat: 52.28852, lng: 0.11591},
-            {addr: "1a Oakington Rd", lat: 52.28722, lng: 0.11461}, {addr: "11 Worland Way", lat: 52.28652, lng: 0.11331},
-            {addr: "6 The Rowells", lat: 52.28582, lng: 0.11261}, {addr: "47 Clarke Cl", lat: 52.28522, lng: 0.11191},
-            {addr: "92 Clarke Cl", lat: 52.28482, lng: 0.11061}, {addr: "4 New Close", lat: 52.28822, lng: 0.11261},
-            {addr: "75 Rampton Rd", lat: 52.28952, lng: 0.11131}, {addr: "86 Rampton Rd", lat: 52.28982, lng: 0.11091},
-            {addr: "113 Rampton Rd", lat: 52.29052, lng: 0.10961}, {addr: "67 Groves Way", lat: 52.28452, lng: 0.11861},
-            {addr: "88 Lambs Ln", lat: 52.28382, lng: 0.12061}, {addr: "8 Pelham Way", lat: 52.28322, lng: 0.12131},
-            {addr: "18 Wilkin Walk", lat: 52.28252, lng: 0.12261}, {addr: "49 Pelham Way", lat: 52.28222, lng: 0.12361},
+            {addr: "8 Moores Court", lat: 52.29243, lng: 0.12582}, {addr: "31 Broad Lane", lat: 52.29228, lng: 0.12534},
+            {addr: "14 Tenison Manor", lat: 52.29212, lng: 0.12317}, {addr: "11 Woodlark Dr", lat: 52.29070, lng: 0.12170},
+            {addr: "30 Woodlark Dr", lat: 52.29060, lng: 0.12134}, {addr: "8 The Herons", lat: 52.28971, lng: 0.12378},
+            {addr: "27 Kestrel Cl", lat: 52.29125, lng: 0.12517}, {addr: "15 Bullfinch Way", lat: 52.29162, lng: 0.12465},
+            {addr: "92 High St", lat: 52.29286, lng: 0.12867}, {addr: "83 High St", lat: 52.29306, lng: 0.12901},
+            {addr: "71 High St", lat: 52.29366, lng: 0.12939}, {addr: "2 Ivatt St", lat: 52.29402, lng: 0.12937},
+            {addr: "5 Ivatt St", lat: 52.29426, lng: 0.12888}, {addr: "38 Ivatt St", lat: 52.29510, lng: 0.12783},
+            {addr: "41 High St", lat: 52.29452, lng: 0.13018}, {addr: "Screens & Graphics", lat: 52.29544, lng: 0.13126},
+            {addr: "19 High St", lat: 52.29564, lng: 0.13127}, {addr: "13 High St", lat: 52.29592, lng: 0.13162},
+            {addr: "Wooden House", lat: 52.29787, lng: 0.13250}, {addr: "Voland Roofing", lat: 52.29820, lng: 0.13321},
+            {addr: "DB Technology", lat: 52.30256, lng: 0.14977}, {addr: "Lost Acres", lat: 52.30385, lng: 0.15248},
+            {addr: "4 Beagle Court", lat: 52.28788, lng: 0.12562}, {addr: "277 High St", lat: 52.28618, lng: 0.12619},
+            {addr: "7 Lacks Cl", lat: 52.28529, lng: 0.12366}, {addr: "4 Wilkin Walk", lat: 52.28466, lng: 0.12267},
+            {addr: "324 High St", lat: 52.28373, lng: 0.12227}, {addr: "330 High St", lat: 52.28351, lng: 0.12187},
+            {addr: "7 Ellis Cl", lat: 52.28248, lng: 0.11956}, {addr: "20 Rampton Rd", lat: 52.28325, lng: 0.11935},
+            {addr: "1a Oakington Rd", lat: 52.28344, lng: 0.11770}, {addr: "11 Worland Way", lat: 52.28389, lng: 0.11429},
+            {addr: "6 The Rowells", lat: 52.28325, lng: 0.11407}, {addr: "47 Clarke Cl", lat: 52.28244, lng: 0.11043},
+            {addr: "92 Clarke Cl", lat: 52.28435, lng: 0.11391}, {addr: "4 New Close", lat: 52.28434, lng: 0.11791},
+            {addr: "75 Rampton Rd", lat: 52.28491, lng: 0.11591}, {addr: "86 Rampton Rd", lat: 52.28556, lng: 0.11520},
+            {addr: "113 Rampton Rd", lat: 52.28618, lng: 0.11288}, {addr: "67 Groves Way", lat: 52.28461, lng: 0.11226},
+            {addr: "88 Lambs Ln", lat: 52.28568, lng: 0.11700}, {addr: "8 Pelham Way", lat: 52.28533, lng: 0.11856},
+            {addr: "18 Wilkin Walk", lat: 52.28500, lng: 0.12213}, {addr: "49 Pelham Way", lat: 52.28389, lng: 0.12056},
             {addr: "62 Lambs Ln", lat: 52.28282, lng: 0.12461}, {addr: "Ladybird Nursery", lat: 52.28312, lng: 0.12561},
             {addr: "Chestnut Nursery", lat: 52.28332, lng: 0.12631}, {addr: "Cottenham Primary", lat: 52.28352, lng: 0.12691},
             {addr: "31 Victory Way", lat: 52.28422, lng: 0.12761}, {addr: "30 Lambs Ln", lat: 52.28452, lng: 0.12831},
@@ -222,6 +241,8 @@
         let lastLat = 52.238, lastLng = 0.182;
         let isUserMovingMap = false;
         let moveTimeout;
+        let is3DMode = false;
+        let userHeading = 0;
         
         let holdTimer;
         let holdDuration = 2000; 
@@ -235,6 +256,26 @@
             }
             setupResetButton();
         };
+
+        function toggle3D() {
+            is3DMode = !is3DMode;
+            const mapEl = document.getElementById('map');
+            const goBtn = document.getElementById('go-btn');
+            
+            if (is3DMode) {
+                mapEl.classList.add('map-3d');
+                goBtn.innerText = "EXIT";
+                goBtn.style.background = "var(--danger)";
+                // FORCED ZOOM ON USER WHEN GO IS PRESSED
+                map.setView([lastLat, lastLng], 19, { animate: true });
+            } else {
+                mapEl.classList.remove('map-3d');
+                mapEl.style.transform = "rotateZ(0deg)";
+                goBtn.innerText = "GO";
+                goBtn.style.background = "var(--success)";
+                updateUI(); 
+            }
+        }
 
         function setupResetButton() {
             const btn = document.getElementById('hold-reset');
@@ -305,7 +346,6 @@
                 return;
             }
             try {
-                // 1. Live Route for current destination
                 const url = `https://router.project-osrm.org/route/v1/driving/${lastLng},${lastLat};${dest.lng},${dest.lat}?overview=full&geometries=geojson`;
                 const res = await fetch(url);
                 const data = await res.json();
@@ -313,25 +353,29 @@
                 let driveTimeToNext = 0;
                 if (data.routes && data.routes[0]) {
                     const route = data.routes[0];
-                    driveTimeToNext = route.duration; // seconds
+                    driveTimeToNext = route.duration;
                     const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
                     routeLine.setLatLngs(coords);
                     
                     const arrivalTime = new Date(Date.now() + driveTimeToNext * 1000);
                     document.getElementById('eta-val').innerText = arrivalTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                     
-                    if (!isUserMovingMap) map.fitBounds(L.latLngBounds(coords), { padding: [50, 50], maxZoom: 18 });
+                    if (!isUserMovingMap) {
+                        if (is3DMode) {
+                            // CONTINUOUS LOCK ON USER IN 3D MODE
+                            map.panTo([lastLat, lastLng], {animate: true});
+                        } else {
+                            map.fitBounds(L.latLngBounds(coords), { padding: [50, 50], maxZoom: 18 });
+                        }
+                    }
                 }
 
-                // 2. Cumulative Worst Case Finish Logic
                 let totalTravelSeconds = driveTimeToNext;
                 const stopsRemaining = stops.length - index;
-                const totalServiceSeconds = stopsRemaining * 120; // 2 mins per call
+                const totalServiceSeconds = stopsRemaining * 120;
 
-                // Calculate road time for all FUTURE legs (A to B, B to C...)
                 for (let i = index; i < stops.length - 1; i++) {
                     const legDist = getDist(stops[i].lat, stops[i].lng, stops[i+1].lat, stops[i+1].lng);
-                    // Estimated 20mph (9m/s) + 1.4x Road Curvature Factor
                     totalTravelSeconds += (legDist * 1.4) / 9; 
                 }
 
@@ -370,13 +414,21 @@
             navigator.geolocation.watchPosition((pos) => {
                 lastLat = pos.coords.latitude;
                 lastLng = pos.coords.longitude;
+                userHeading = pos.coords.heading || 0;
+
                 document.getElementById('gps-status').innerText = `GPS ACCURACY: ${pos.coords.accuracy.toFixed(1)}m`;
                 userMarker.setLatLng([lastLat, lastLng]);
                 
+                if (is3DMode) {
+                    const mapEl = document.getElementById('map');
+                    mapEl.style.transform = `rotateX(50deg) rotateZ(${-userHeading}deg) scale(1.3)`;
+                    if(!isUserMovingMap) map.panTo([lastLat, lastLng]);
+                }
+
                 for (let i = index; i < stops.length; i++) {
                     const s = stops[i];
                     const d = getDist(lastLat, lastLng, s.lat, s.lng);
-                    if (d < 10) { 
+                    if (d < 12) { 
                         if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
                         index = i + 1; 
                         updateUI();
