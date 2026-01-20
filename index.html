@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Logistics Pro - Full Breadcrumbs</title>
+    <title>Logistics Pro - Smart Jump 10m</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -88,7 +88,7 @@
     <script>
         let index = 0;
         let map, userMarker, routeLine;
-        let stopMarkers = []; // Array to hold marker objects for fast color updates
+        let stopMarkers = []; 
         let lastLat = 52.238, lastLng = 0.182;
         let isUserMovingMap = false;
         let moveTimeout;
@@ -119,20 +119,20 @@
             {addr: "14 Jubilee Cl", lat: 52.27114, lng: 0.18790},
             {addr: "3 Vicarage Cl", lat: 52.26717, lng: 0.18968},
             {addr: "29 Vicarage Cl", lat: 52.26711, lng: 0.18795},
-            {addr: "16 Cambridge Rd", lat: 52.26752, lng: 0.19201},
-            {addr: "15 Cambridge Rd", lat: 52.26742, lng: 0.19225},
-            {addr: "49 Cambridge Rd", lat: 52.26551, lng: 0.19352},
-            {addr: "70 Cambridge Rd", lat: 52.26421, lng: 0.19421},
-            {addr: "139 Waterbeach Rd", lat: 52.26195, lng: 0.17865},
-            {addr: "127 Waterbeach Rd", lat: 52.26135, lng: 0.17792},
-            {addr: "87 Waterbeach Rd", lat: 52.26021, lng: 0.17635},
-            {addr: "8a Matthew Parker Cl", lat: 52.25965, lng: 0.17491},
-            {addr: "1 Abrahams Cl", lat: 52.25892, lng: 0.17531},
-            {addr: "11 Abrahams Cl", lat: 52.25928, lng: 0.17555},
-            {addr: "12 Abrahams Cl", lat: 52.25935, lng: 0.17562},
-            {addr: "14 Abrahams Cl", lat: 52.25948, lng: 0.17581},
-            {addr: "47 High St", lat: 52.25835, lng: 0.17321},
-            {addr: "The Silver Cloud", lat: 52.25762, lng: 0.17265},
+            {addr: "16 Cambridge Rd", lat: 52.26535, lng: 0.18826},
+            {addr: "15 Cambridge Rd", lat: 52.26503, lng: 0.18842},
+            {addr: "48 Cambridge Rd", lat: 52.26405, lng: 0.18729},
+            {addr: "70 Cambridge Rd", lat: 52.26382, lng: 0.18612},
+            {addr: "139 Waterbeach Rd", lat: 52.26410, lng: 0.17774},
+            {addr: "127 Waterbeach Rd", lat: 52.26409, lng: 0.17662},
+            {addr: "87 Waterbeach Rd", lat: 52.26414, lng: 0.17154},
+            {addr: "8a Matthew Parker Cl", lat: 52.26327, lng: 0.16487},
+            {addr: "1 Abrahams Cl", lat: 52.26339, lng: 0.16327},
+            {addr: "11 Abrahams Cl", lat: 52.26324, lng: 0.16395},
+            {addr: "12 Abrahams Cl", lat: 52.26324, lng: 0.16384},
+            {addr: "14 Abrahams Cl", lat: 52.26326, lng: 0.16357},
+            {addr: "47 High St", lat: 52.26229, lng: 0.16350},
+            {addr: "The Silver Cloud", lat: 52.25701, lng: 0.16330},
             {addr: "22 David Bull Way", lat: 52.23985, lng: 0.16118},
             {addr: "40 Sutton Cl", lat: 52.24158, lng: 0.16432},
             {addr: "26 Sutton Cl", lat: 52.24112, lng: 0.16491},
@@ -294,7 +294,6 @@
             map = L.map('map', { zoomControl: false, attributionControl: false }).setView([lastLat, lastLng], 17);
             L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}').addTo(map);
             
-            // Draw all markers once at initialization
             stops.forEach((stop, i) => {
                 const marker = L.circleMarker([stop.lat, stop.lng], {
                     radius: 6,
@@ -338,18 +337,16 @@
             document.getElementById('prog-fill').style.width = ((index / stops.length) * 100) + "%";
             localStorage.setItem('log_nav_idx', index);
 
-            // Update physical marker colors instantly without redrawing map
             stopMarkers.forEach((m, i) => {
                 if (i === index) {
-                    m.setStyle({ fillColor: "#ff453a", radius: 10, weight: 3 }); // Red/Large for Current
+                    m.setStyle({ fillColor: "#ff453a", radius: 10, weight: 3 });
                     m.bringToFront();
                 } else if (i < index) {
-                    m.setStyle({ fillColor: "#444", radius: 5, weight: 1 }); // Grey/Small for Done
+                    m.setStyle({ fillColor: "#444", radius: 5, weight: 1 });
                 } else {
-                    m.setStyle({ fillColor: "#ffd60a", radius: 6, weight: 1 }); // Yellow for Upcoming
+                    m.setStyle({ fillColor: "#ffd60a", radius: 6, weight: 1 });
                 }
             });
-
             fetchRoute();
         }
 
@@ -360,14 +357,22 @@
                 document.getElementById('gps-status').innerText = `GPS ACCURACY: ${pos.coords.accuracy.toFixed(1)}m`;
                 userMarker.setLatLng([lastLat, lastLng]);
                 
-                const target = stops[index];
-                if (target && getDist(lastLat, lastLng, target.lat, target.lng) < 20) {
-                    if (index < stops.length - 1) {
-                        index++; 
+                // SMART JUMP LOGIC (10m threshold):
+                // Check current stop and all future stops
+                for (let i = index; i < stops.length; i++) {
+                    const s = stops[i];
+                    const d = getDist(lastLat, lastLng, s.lat, s.lng);
+                    
+                    if (d < 10) { 
+                        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                        // Mark current and all skipped previous as done, move to next
+                        index = i + 1; 
+                        if (index >= stops.length) index = stops.length - 1;
                         updateUI();
-                        if (navigator.vibrate) navigator.vibrate(200);
+                        break; 
                     }
                 }
+
                 if (!isUserMovingMap) fetchRoute();
             }, null, { enableHighAccuracy: true });
         }
