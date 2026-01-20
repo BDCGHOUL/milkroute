@@ -198,15 +198,24 @@
             document.getElementById('prog-fill').style.width = (index / data.length) * 100 + "%";
             localStorage.setItem(`index_${currentRun}`, index);
 
-            // Refresh Map Pins
+            // Refresh Map Pins - Only showing UPCOMING stops
             if (markerLayer) {
                 markerLayer.clearLayers();
                 data.forEach((stop, i) => {
-                    const color = (i === index) ? "#ff453a" : "#0a84ff";
-                    const size = (i === index) ? 8 : 4;
-                    L.circleMarker([stop.lat, stop.lng], {
-                        radius: size, fillColor: color, color: "#fff", weight: 1, fillOpacity: 0.8
-                    }).addTo(markerLayer);
+                    // Logic: Only draw the pin if it hasn't been reached yet
+                    if (i >= index) {
+                        const isCurrent = (i === index);
+                        const color = isCurrent ? "#ff453a" : "#0a84ff";
+                        const size = isCurrent ? 8 : 4;
+                        
+                        L.circleMarker([stop.lat, stop.lng], {
+                            radius: size, 
+                            fillColor: color, 
+                            color: "#fff", 
+                            weight: 1, 
+                            fillOpacity: 0.8
+                        }).addTo(markerLayer);
+                    }
                 });
             }
         }
