@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Logistics Pro</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         :root {
             --bg: #000000;
@@ -43,6 +45,8 @@
         .btn { flex: 1; border: none; padding: 14px; border-radius: 10px; font-weight: 700; font-size: 14px; cursor: pointer; }
         .btn-start { background: var(--accent); color: white; padding: 12px 40px; flex: none; width: auto; }
         
+        #map { height: 300px; width: 100%; border-radius: 12px; margin-top: 10px; border: 1px solid #333; background: #000; }
+
         .hold-container { position: relative; margin-top: 12px; background: #000; border-radius: 8px; height: 36px; overflow: hidden; border: 1px solid #333; }
         .btn-reset { position: absolute; width: 100%; height: 100%; background: none; color: #555; z-index: 2; font-size: 10px; font-weight: bold; border: none; }
         .hold-progress { position: absolute; top: 0; left: 0; height: 100%; width: 0%; background: var(--danger); opacity: 0.3; z-index: 1; }
@@ -76,6 +80,9 @@
             <button class="btn" style="background:#2c2c2e; color:white;" onclick="changeStop(-1)">BACK</button>
             <button class="btn" style="background:#3a1c1c; color:var(--danger);" onclick="changeStop(1)">SKIP</button>
         </div>
+        
+        <div id="map"></div>
+
         <div class="hold-container">
             <button class="btn-reset" onmousedown="startHold()" onmouseup="stopHold()" ontouchstart="startHold()" ontouchend="stopHold()">HOLD TO RESET</button>
             <div id="hold-progress" class="hold-progress"></div>
@@ -131,16 +138,14 @@
         let currentRun = "";
         let index = 0;
         let holdTimer;
+        let map, userMarker, routeLine, markerLayer;
 
         window.onload = function() {
             const now = new Date();
             const hour = now.getHours();
             let bizDay = now.getDay();
-
-            // 4 PM Business Reset
             if (hour < 16) bizDay = (bizDay === 0) ? 6 : bizDay - 1;
 
-            // Schedule: Sun, Tue, Thu = Village | Mon, Wed, Fri = Town
             if ([0, 2, 4].includes(bizDay)) currentRun = "village";
             else if ([1, 3, 5].includes(bizDay)) currentRun = "town";
             else currentRun = "none";
@@ -167,8 +172,23 @@
             
             if (currentRun !== 'village') document.getElementById('village-calc-card').classList.add('hidden');
             
+            initMap();
             initGPS();
             updateUI();
+        }
+
+        function initMap() {
+            // Dark Mode tiles
+            const darkTiles = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+            map = L.map('map', { zoomControl: false, attributionControl: false }).setView([52.2, 0.1], 16);
+            L.tileLayer(darkTiles).addTo(map);
+            
+            markerLayer = L.layerGroup().addTo(map);
+            routeLine = L.polyline([], {color: '#0a84ff', weight: 3, dashArray: '5, 10'}).addTo(map);
+            
+            userMarker = L.circleMarker([0,0], {
+                radius: 8, fillColor: "#fff", color: "#0a84ff", weight: 3, fillOpacity: 1
+            }).addTo(map);
         }
 
         function updateUI() {
@@ -177,6 +197,50 @@
             document.getElementById('next-addr').innerText = data[index] ? data[index].addr : "FINISHED";
             document.getElementById('prog-fill').style.width = (index / data.length) * 100 + "%";
             localStorage.setItem(`index_${currentRun}`, index);
+
+            // Refresh Map Pins
+            if (markerLayer) {
+                markerLayer.clearLayers();
+                data.forEach((stop, i) => {
+                    const color = (i === index) ? "#ff453a" : "#0a84ff";
+                    const size = (i === index) ? 8 : 4;
+                    L.circleMarker([stop.lat, stop.lng], {
+                        radius: size, fillColor: color, color: "#fff", weight: 1, fillOpacity: 0.8
+                    }).addTo(markerLayer);
+                });
+            }
+        }
+
+        function initGPS() {
+            navigator.geolocation.watchPosition((pos) => {
+                const myLat = pos.coords.latitude;
+                const myLng = pos.coords.longitude;
+                document.getElementById('gps-bar').innerText = `ACCURACY: ${pos.coords.accuracy.toFixed(0)}M`;
+                
+                const data = routes[currentRun];
+                const target = data[index];
+
+                if (target) {
+                    // Update Map Position & Line
+                    userMarker.setLatLng([myLat, myLng]);
+                    routeLine.setLatLngs([[myLat, myLng], [target.lat, target.lng]]);
+                    
+                    // Auto-Zoom to fit you and the target
+                    const bounds = L.latLngBounds([[myLat, myLng], [target.lat, target.lng]]);
+                    map.fitBounds(bounds, {padding: [50, 50], maxZoom: 18});
+
+                    // Proximity & Auto-Skip Logic
+                    for (let i = index; i < data.length; i++) {
+                        const d = getDist(myLat, myLng, data[i].lat, data[i].lng);
+                        if (d < 30) { 
+                            index = i + 1; 
+                            updateUI();
+                            if (navigator.vibrate) navigator.vibrate(200);
+                            break; 
+                        }
+                    }
+                }
+            }, null, { enableHighAccuracy: true });
         }
 
         function changeStop(dir) {
@@ -208,30 +272,6 @@
             document.getElementById('l-out').innerText = v ? v % 18 : 0;
         }
 
-        function initGPS() {
-    navigator.geolocation.watchPosition((pos) => {
-        const myLat = pos.coords.latitude;
-        const myLng = pos.coords.longitude;
-        document.getElementById('gps-bar').innerText = `ACCURACY: ${pos.coords.accuracy.toFixed(0)}M`;
-        
-        const data = routes[currentRun];
-        
-        // Scan through the remaining stops in the list
-        for (let i = index; i < data.length; i++) {
-            const d = getDist(myLat, myLng, data[i].lat, data[i].lng);
-            
-            // If we detect you are at ANY upcoming house (even if you skipped some)
-            if (d < 30) { 
-                // Set the current index to the stop AFTER the one we just detected
-                index = i + 1; 
-                updateUI();
-                if (navigator.vibrate) navigator.vibrate(200);
-                break; // Exit loop since we found our new position
-            }
-        }
-    }, null, { enableHighAccuracy: true });
-}
-
         function getDist(lat1, lon1, lat2, lon2) {
             const R = 6371000;
             const dLat = (lat2-lat1) * Math.PI/180;
@@ -239,6 +279,23 @@
             const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
+
+        setInterval(function() {
+            const now = new Date();
+            const hour = now.getHours();
+            let bizDay = now.getDay();
+            if (hour < 16) bizDay = (bizDay === 0) ? 6 : bizDay - 1;
+
+            let shouldBeRun = ([0, 2, 4].includes(bizDay)) ? "village" : ([1, 3, 5].includes(bizDay) ? "town" : "none");
+
+            if (document.getElementById('overlay').style.display !== 'none' && shouldBeRun !== currentRun) {
+                location.reload();
+            }
+
+            document.getElementById('date-display').innerText = now.toLocaleDateString();
+            const syncIndex = parseInt(localStorage.getItem(`index_${currentRun}`)) || 0;
+            if (syncIndex !== index) { index = syncIndex; updateUI(); }
+        }, 30000);
     </script>
 </body>
 </html>
