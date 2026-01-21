@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Logistics Pro - 3D Follow V3</title>
+    <title>Logistics Pro - Auto-Scheduler V5.1</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -20,11 +20,11 @@
         #overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: var(--bg); z-index: 9999; display: flex;
-            flex-direction: column; align-items: center; justify-content: center;
+            flex-direction: column; align-items: center; justify-content: center; text-align: center;
         }
         .btn-start {
             background: var(--accent); color: white; border: none;
-            padding: 12px 30px; border-radius: 8px; font-size: 16px; font-weight: 600;
+            padding: 15px 40px; border-radius: 12px; font-size: 18px; font-weight: bold; margin-top: 20px;
         }
         .header { padding: 5px 0; display: flex; justify-content: space-between; align-items: flex-end; }
         .header h1 { margin: 0; font-size: 14px; color: var(--text-dim); text-transform: uppercase; }
@@ -38,118 +38,113 @@
 
         .card { background: var(--card); border-radius: 12px; padding: 15px; margin-bottom: 10px; position: relative; overflow: hidden; }
         .big-val { font-size: 48px; font-weight: 800; color: var(--success); line-height: 1; }
-        .addr-text { font-size: 19px; font-weight: 700; color: var(--accent); margin: 12px 0; min-height: 48px; text-align: center; }
+        .addr-text { font-size: 20px; font-weight: 700; color: var(--accent); margin: 12px 0; min-height: 55px; text-align: center; }
+        
+        .arrived-alert { background: #1a321f !important; border: 2px solid var(--success); }
         
         .btn-group { display: flex; gap: 8px; }
         .btn-nav { flex: 1; border: none; padding: 18px; border-radius: 10px; font-weight: 700; font-size: 15px; }
 
-        /* Arrival Timer Bar */
-        #dwell-container { position: absolute; bottom: 0; left: 0; width: 100%; height: 6px; background: #333; }
-        #dwell-fill { height: 100%; width: 0%; background: var(--success); transition: width 1s linear; }
+        #dwell-container { position: absolute; bottom: 0; left: 0; width: 100%; height: 8px; background: #333; z-index: 10; }
+        #dwell-fill { height: 100%; width: 0%; background: var(--success); }
 
         #map-container { position: relative; margin-top: 10px; perspective: 1000px; overflow: hidden; border-radius: 10px; }
-        #map { 
-            height: 400px; width: 100%; border: 1px solid #333;
-            transition: transform 0.4s ease-out;
-        }
-        
-        .map-3d {
-            transform: rotateX(50deg) scale(1.3);
-            height: 550px !important;
-            margin-top: -75px;
-        }
-
-        .btn-reset-mini {
-            position: absolute; top: 10px; left: 10px; z-index: 1000;
-            width: 40px; height: 40px; background: rgba(28, 28, 30, 0.9);
-            border: 2px solid var(--danger); border-radius: 8px;
-            display: flex; align-items: center; justify-content: center;
-            color: var(--danger); font-size: 10px; font-weight: 800;
-            overflow: hidden; touch-action: none;
-        }
+        #map { height: 400px; width: 100%; border: 1px solid #333; transition: transform 0.4s ease-out; }
+        .map-3d { transform: rotateX(50deg) scale(1.3); height: 550px !important; margin-top: -75px; }
 
         #go-btn {
             position: absolute; top: 10px; right: 10px; z-index: 1000;
             background: var(--success); color: black; border: none;
             padding: 10px 20px; border-radius: 25px; font-weight: 900;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
-            letter-spacing: 1px;
-        }
-
-        #reset-fill {
-            position: absolute; bottom: 0; left: 0; width: 100%; height: 0%;
-            background: rgba(255, 69, 58, 0.4); pointer-events: none;
         }
 
         .calc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: center; margin-top: 8px; }
-        .calc-input { width: 100%; background: #000; border: 1px solid #333; color: #fff; font-size: 22px; padding: 8px; border-radius: 8px; text-align: center; box-sizing: border-box; }
-        #gps-status { font-size: 9px; color: #555; text-align: center; margin-top: 4px; }
+        .calc-input { width: 100%; background: #000; border: 1px solid #333; color: #fff; font-size: 26px; padding: 12px; border-radius: 8px; text-align: center; box-sizing: border-box; }
+        #gps-status { font-size: 10px; color: #8e8e93; text-align: center; margin-top: 6px; font-weight: bold; }
         
         .eta-box { text-align: right; color: var(--text-dim); font-size: 11px; font-weight: bold; }
         #eta-val { color: var(--warning); font-size: 18px; display: block; }
+        #dist-debug { font-size: 10px; color: var(--text-dim); position: absolute; top: 5px; left: 15px; }
+        #skip-msg { font-size: 10px; color: var(--warning); position: absolute; top: 5px; right: 15px; font-weight: bold; }
+        #run-indicator { color: var(--accent); font-weight: 900; letter-spacing: 1px; margin-bottom: 5px; font-size: 14px; }
     </style>
 </head>
 <body>
 
     <div id="overlay">
-        <h2 style="margin-bottom: 20px;">VILLAGE RUN</h2>
-        <button id="start-btn" class="btn-start" onclick="startApp()">START SHIFT</button>
+        <div id="overlay-content">
+            <h2 id="route-title" style="margin-bottom: 10px; letter-spacing: 2px;">LOADING...</h2>
+            <div id="day-display" style="color: #8e8e93; font-size: 14px; margin-bottom: 20px;"></div>
+            <button id="start-btn" class="btn-start" onclick="startApp()">START WORK</button>
+        </div>
+        <div id="off-work-msg" style="display:none;">
+            <h1 style="color: var(--success); font-size: 40px;">SATURDAY</h1>
+            <h3>NO WORK TONIGHT</h3>
+            <p style="color: #8e8e93;">Enjoy your night off!</p>
+        </div>
     </div>
 
     <div class="header">
         <div>
             <h1>Logistics Pro</h1>
-            <div id="date-box" style="font-size: 10px; color: var(--text-dim);"></div>
+            <div id="date-box" style="font-size: 12px; font-weight:bold; color: var(--text);"></div>
         </div>
         <div class="wct-box">
-            <span class="wct-label">Worst Case Finish</span>
+            <span class="wct-label">Est. Finish</span>
             <span id="wct-val">--:--</span>
         </div>
     </div>
 
     <div class="prog-bar"><div id="prog-fill"></div></div>
 
-    <div class="card">
+    <div class="card" id="main-card">
+        <div id="dist-debug">DIST: --m</div>
+        <div id="skip-msg"></div>
         <div style="display:flex; justify-content: space-between; align-items: flex-start;">
             <div class="big-val" id="rem-count">0</div>
             <div class="eta-box">
+                <div id="run-indicator">VILLAGE</div>
                 NEXT STOP<br>
                 <span id="eta-val">--:--</span>
                 <span style="font-size: 9px; opacity: 0.7;">STOPS REMAINING</span>
             </div>
         </div>
         
-        <div id="next-addr" class="addr-text">Connecting...</div>
+        <div id="next-addr" class="addr-text">GPS Loading...</div>
 
         <div class="btn-group">
             <button class="btn-nav" style="background:#2c2c2e; color:white;" onclick="changeStop(-1)">BACK</button>
-            <button class="btn-nav" style="background:var(--danger); color:white;" onclick="changeStop(1)">SKIP / NEXT</button>
+            <button class="btn-nav" style="background:var(--accent); color:white;" onclick="changeStop(1)">SKIP</button>
         </div>
 
         <div id="dwell-container"><div id="dwell-fill"></div></div>
     </div>
 
     <div id="map-container">
-        <div id="hold-reset" class="btn-reset-mini">
-            <div id="reset-fill"></div>
-            <span style="z-index:1001">RST</span>
-        </div>
-        <button id="go-btn" onclick="toggle3D()">GO</button>
+        <button id="go-btn" onclick="toggle3D()">3D GO</button>
         <div id="map"></div>
     </div>
     
     <div id="gps-status">GPS STANDBY</div>
 
-    <div class="card">
+    <div class="card" style="margin-top: 10px;">
         <input type="number" id="calc-in" class="calc-input" placeholder="Enter Total Items" oninput="doCalc()">
         <div class="calc-grid">
-            <div><span id="p-out" style="color:var(--success); font-size: 24px; font-weight: 800;">0</span><br><small>PACKS (18)</small></div>
-            <div><span id="l-out" style="color:var(--warning); font-size: 24px; font-weight: 800;">0</span><br><small>LOOSE</small></div>
+            <div><span id="p-out" style="color:var(--success); font-size: 28px; font-weight: 800;">0</span><br><small>PACKS (18)</small></div>
+            <div><span id="l-out" style="color:var(--warning); font-size: 28px; font-weight: 800;">0</span><br><small>LOOSE</small></div>
         </div>
     </div>
 
     <script>
-        const stops = [
+        // --- DATA SECTION ---
+
+        // >>> PASTE YOUR TOWN RUN STOPS HERE <<<
+        const townStops = [
+            {addr: "Town Centre Start (Example)", lat: 52.238923, lng: 0.182703}, 
+            {addr: "Please Paste Town List In Code", lat: 52.239562, lng: 0.186159}
+        ];
+
+        const villageStops = [
             {addr: "27 Priory Rd", lat: 52.238923, lng: 0.182703}, {addr: "The Old Vicarage", lat: 52.239562, lng: 0.186159},
             {addr: "Riverside House", lat: 52.256633, lng: 0.198421}, {addr: "49 Station Rd", lat: 52.263434, lng: 0.195682},
             {addr: "5 Payton Way", lat: 52.26457, lng: 0.19614}, {addr: "26 Burgess Rd", lat: 52.26542, lng: 0.19783},
@@ -241,263 +236,233 @@
             {addr: "27 Dunstall Field", lat: 52.28542, lng: 0.14231}, {addr: "34 Histon Rd", lat: 52.28352, lng: 0.14391}
         ];
 
+        let stops = [];
         let index = 0;
-        let map, userMarker, routeLine;
+        let map, userMarker, routeLine, dwellTimer;
         let stopMarkers = []; 
         let lastLat = 52.238, lastLng = 0.182;
-        let isUserMovingMap = false;
-        let moveTimeout;
-        let is3DMode = false;
-        let userHeading = 0;
-        
-        // Timer Globals
-        let dwellTimer = null;
-        let dwellCount = 0;
+        let isUserMovingMap = false, is3DMode = false;
+        let countdownActive = false;
         let wakeLock = null;
-
-        // Reset Globals
-        let holdTimer;
-        let holdDuration = 2000; 
+        
+        const TRIGGER_DIST = 45; 
 
         window.onload = function() {
-            document.getElementById('date-box').innerText = new Date().toLocaleDateString();
-            const saved = localStorage.getItem('log_nav_idx');
-            if (saved) {
-                index = Math.min(parseInt(saved), stops.length - 1);
-                document.getElementById('start-btn').innerText = "RESUME AT " + (index + 1);
+            // --- DATE & SCHEDULE LOGIC ---
+            const now = new Date();
+            
+            // 1. SCHEDULE LOGIC (Uses ACTUAL day, no rollover)
+            // This ensures if it's Wed 5pm, you still get Wed Run.
+            const scheduleDay = now.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+
+            // 2. DISPLAY LOGIC (Uses 4PM rollover for paperwork/visuals only)
+            const displayDate = new Date(now);
+            if (now.getHours() >= 16) {
+                displayDate.setDate(now.getDate() + 1);
             }
-            setupResetButton();
+            const dateStr = displayDate.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+            document.getElementById('date-box').innerText = dateStr.toUpperCase();
+            document.getElementById('day-display').innerText = now.toLocaleDateString('en-GB', { weekday: 'long' }).toUpperCase();
+
+            // ROUTE SELECTION
+            const routeTitle = document.getElementById('route-title');
+            const runInd = document.getElementById('run-indicator');
+            const content = document.getElementById('overlay-content');
+            const offMsg = document.getElementById('off-work-msg');
+
+            // 6 = Saturday (Off)
+            if (scheduleDay === 6) {
+                content.style.display = 'none';
+                offMsg.style.display = 'block';
+                return; // Stop execution
+            }
+
+            // 0=Sun, 2=Tue, 4=Thu -> VILLAGE RUN
+            if (scheduleDay === 0 || scheduleDay === 2 || scheduleDay === 4) {
+                stops = villageStops;
+                routeTitle.innerText = "VILLAGE RUN V5.1";
+                runInd.innerText = "VILLAGE RUN";
+            }
+            // 1=Mon, 3=Wed, 5=Fri -> TOWN RUN
+            else if (scheduleDay === 1 || scheduleDay === 3 || scheduleDay === 5) {
+                stops = townStops;
+                routeTitle.innerText = "TOWN RUN V5.1";
+                runInd.innerText = "TOWN RUN";
+            }
+
+            // RESUME LOGIC (Only if valid stops loaded)
+            if (stops.length > 0) {
+                const saved = localStorage.getItem('log_nav_idx');
+                if (saved !== null) {
+                    index = Math.min(parseInt(saved), stops.length - 1);
+                    document.getElementById('start-btn').innerText = "RESUME AT STOP " + (index + 1);
+                }
+            }
         };
 
-        // Screen Wake Lock
-        async function stayAwake() {
-            try {
-                if ('wakeLock' in navigator) {
-                    wakeLock = await navigator.wakeLock.request('screen');
-                    console.log("Wake Lock Active");
-                }
-            } catch (err) {}
-        }
-
-        function toggle3D() {
-            is3DMode = !is3DMode;
-            const mapEl = document.getElementById('map');
-            const goBtn = document.getElementById('go-btn');
-            
-            // Trigger Wake Lock on GO click
-            stayAwake();
-
-            if (is3DMode) {
-                mapEl.classList.add('map-3d');
-                goBtn.innerText = "EXIT";
-                goBtn.style.background = "var(--danger)";
-                map.setView([lastLat, lastLng], 19, { animate: true });
-            } else {
-                mapEl.classList.remove('map-3d');
-                mapEl.style.transform = "rotateZ(0deg)";
-                goBtn.innerText = "GO";
-                goBtn.style.background = "var(--success)";
-                updateUI(); 
-            }
-        }
-
-        function setupResetButton() {
-            const btn = document.getElementById('hold-reset');
-            const fill = document.getElementById('reset-fill');
-
-            const startHold = (e) => {
-                e.preventDefault();
-                fill.style.transition = `height ${holdDuration}ms linear`;
-                fill.style.height = "100%";
-                holdTimer = setTimeout(() => {
-                    index = 0;
-                    localStorage.removeItem('log_nav_idx');
-                    updateUI();
-                    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-                    endHold();
-                }, holdDuration);
-            };
-
-            const endHold = () => {
-                clearTimeout(holdTimer);
-                fill.style.transition = "height 0.2s ease-out";
-                fill.style.height = "0%";
-            };
-
-            btn.addEventListener('mousedown', startHold);
-            btn.addEventListener('touchstart', startHold);
-            btn.addEventListener('mouseup', endHold);
-            btn.addEventListener('touchend', endHold);
-        }
-
-        function startApp() {
+        async function startApp() {
             document.getElementById('overlay').style.display = 'none';
-            stayAwake();
+            try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
             initMap();
             initGPS();
             updateUI();
         }
 
         function initMap() {
-            map = L.map('map', { zoomControl: false, attributionControl: false }).setView([lastLat, lastLng], 17);
+            // Center map on first stop of current list
+            let startLat = stops[0].lat;
+            let startLng = stops[0].lng;
+            
+            map = L.map('map', { zoomControl: false, attributionControl: false }).setView([startLat, startLng], 17);
             L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}').addTo(map);
             
             stops.forEach((stop, i) => {
                 const marker = L.circleMarker([stop.lat, stop.lng], {
-                    radius: 6,
-                    fillColor: (i === index) ? "#ff453a" : "#ffd60a",
-                    color: "#fff",
-                    weight: 1,
-                    fillOpacity: 1
+                    radius: 6, fillColor: (i === index) ? "#ff453a" : "#ffd60a",
+                    color: "#fff", weight: 1, fillOpacity: 1
                 }).addTo(map);
                 stopMarkers.push(marker);
             });
 
-            routeLine = L.polyline([], { color: '#0a84ff', weight: 8, opacity: 0.9, lineJoin: 'round' }).addTo(map);
+            routeLine = L.polyline([], { color: '#0a84ff', weight: 8, opacity: 0.8 }).addTo(map);
             userMarker = L.circleMarker([0,0], { radius: 10, fillColor: "#fff", color: "#0a84ff", weight: 4, fillOpacity: 1 }).addTo(map);
-
+            
             map.on('movestart', () => {
                 isUserMovingMap = true;
-                clearTimeout(moveTimeout);
-                moveTimeout = setTimeout(() => isUserMovingMap = false, 8000);
+                setTimeout(() => isUserMovingMap = false, 15000); 
             });
         }
 
-        // 5-Second Presence Logic
-        function checkPresence(uLat, uLng) {
-            const target = stops[index];
-            if (!target) return;
+        function checkProximity(lat, lng) {
+            for (let i = index; i < stops.length; i++) {
+                let d = getDist(lat, lng, stops[i].lat, stops[i].lng);
+                
+                if (i === index) document.getElementById('dist-debug').innerText = `DIST: ${Math.round(d)}m`;
 
-            const dist = getDist(uLat, uLng, target.lat, target.lng);
-            const statusEl = document.getElementById('gps-status');
-            const progressEl = document.getElementById('dwell-fill');
-
-            if (dist < 20) { // Within 20 meters
-                if (!dwellTimer) {
-                    statusEl.innerText = "AT STOP: REGISTERING IN 5S...";
-                    statusEl.style.color = "var(--success)";
-                    dwellCount = 0;
-                    dwellTimer = setInterval(() => {
-                        dwellCount++;
-                        progressEl.style.width = (dwellCount * 20) + "%";
-                        if (dwellCount >= 5) {
-                            clearInterval(dwellTimer);
-                            dwellTimer = null;
-                            progressEl.style.width = "0%";
-                            index++;
-                            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-                            updateUI();
-                        }
-                    }, 1000);
-                }
-            } else {
-                if (dwellTimer) {
-                    clearInterval(dwellTimer);
-                    dwellTimer = null;
-                    dwellCount = 0;
-                    progressEl.style.width = "0%";
-                    statusEl.innerText = "GPS ACTIVE";
-                    statusEl.style.color = "#555";
+                if (d < TRIGGER_DIST && !countdownActive) {
+                    if (i > index) {
+                        let skippedCount = i - index;
+                        document.getElementById('skip-msg').innerText = `CLEARED ${skippedCount} PRIOR STOPS`;
+                        index = i; 
+                    }
+                    startHiddenCountdown();
+                    break; 
                 }
             }
+        }
+
+        function startHiddenCountdown() {
+            countdownActive = true;
+            const mainCard = document.getElementById('main-card');
+            const fill = document.getElementById('dwell-fill');
+            
+            mainCard.classList.add('arrived-alert');
+            if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
+
+            let time = 0;
+            dwellTimer = setInterval(() => {
+                time += 2; 
+                fill.style.width = time + "%";
+                
+                if (time >= 100) {
+                    clearInterval(dwellTimer);
+                    mainCard.classList.remove('arrived-alert');
+                    fill.style.width = "0%";
+                    document.getElementById('skip-msg').innerText = "";
+                    index++;
+                    countdownActive = false;
+                    updateUI();
+                }
+            }, 100);
         }
 
         async function fetchRoute() {
             const dest = stops[index];
-            if (!dest) {
-                document.getElementById('eta-val').innerText = "DONE";
-                document.getElementById('wct-val').innerText = "FINISHED";
-                return;
-            }
+            if (!dest) return;
             try {
                 const url = `https://router.project-osrm.org/route/v1/driving/${lastLng},${lastLat};${dest.lng},${dest.lat}?overview=full&geometries=geojson`;
                 const res = await fetch(url);
                 const data = await res.json();
-                
-                let driveTimeToNext = 0;
                 if (data.routes && data.routes[0]) {
                     const route = data.routes[0];
-                    driveTimeToNext = route.duration;
-                    const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
-                    routeLine.setLatLngs(coords);
+                    routeLine.setLatLngs(route.geometry.coordinates.map(c => [c[1], c[0]]));
                     
-                    const arrivalTime = new Date(Date.now() + driveTimeToNext * 1000);
-                    document.getElementById('eta-val').innerText = arrivalTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    const arrival = new Date(Date.now() + route.duration * 1000);
+                    document.getElementById('eta-val').innerText = arrival.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
                     
-                    if (!isUserMovingMap) {
-                        if (is3DMode) {
-                            map.panTo([lastLat, lastLng], {animate: true});
-                        } else {
-                            map.fitBounds(L.latLngBounds(coords), { padding: [50, 50], maxZoom: 18 });
-                        }
-                    }
+                    const remaining = stops.length - index;
+                    const finish = new Date(Date.now() + (route.duration * 1.3 * 1000) + (remaining * 90000));
+                    document.getElementById('wct-val').innerText = finish.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
                 }
-
-                // WCT Calculation
-                let totalTravelSeconds = driveTimeToNext;
-                const stopsRemaining = stops.length - index;
-                const totalServiceSeconds = stopsRemaining * 120; // 2 mins per stop
-
-                for (let i = index; i < stops.length - 1; i++) {
-                    const legDist = getDist(stops[i].lat, stops[i].lng, stops[i+1].lat, stops[i+1].lng);
-                    totalTravelSeconds += (legDist * 1.4) / 9; 
-                }
-
-                const finishDate = new Date(Date.now() + (totalTravelSeconds * 1000) + (totalServiceSeconds * 1000));
-                document.getElementById('wct-val').innerText = finishDate.toLocaleTimeString([], { 
-                    hour: '2-digit', minute: '2-digit' 
-                });
-
-            } catch (e) { 
-                console.error("Route error:", e);
-            }
+            } catch (e) { console.error("Routing error:", e); }
         }
 
         function updateUI() {
+            if (index >= stops.length) {
+                document.getElementById('next-addr').innerText = "ROUTE COMPLETE";
+                document.getElementById('eta-val').innerText = "--:--";
+                return;
+            }
+            
             const current = stops[index];
+            document.getElementById('next-addr').innerText = current.addr;
             document.getElementById('rem-count').innerText = stops.length - index;
-            document.getElementById('next-addr').innerText = current ? current.addr : "FINISHED";
             document.getElementById('prog-fill').style.width = ((index / stops.length) * 100) + "%";
             localStorage.setItem('log_nav_idx', index);
-
+            
             stopMarkers.forEach((m, i) => {
-                if (i === index) {
-                    m.setStyle({ fillColor: "#ff453a", radius: 10, weight: 3 });
-                    m.bringToFront();
-                } else if (i < index) {
-                    m.setStyle({ fillColor: "#444", radius: 5, weight: 1 });
-                } else {
-                    m.setStyle({ fillColor: "#ffd60a", radius: 6, weight: 1 });
-                }
+                if (i === index) m.setStyle({fillColor: "#ff453a", radius: 10});
+                else if (i < index) m.setStyle({fillColor: "#444", radius: 5});
+                else m.setStyle({fillColor: "#ffd60a", radius: 6});
             });
+
+            if (!isUserMovingMap) {
+                map.setView([lastLat, lastLng], 17);
+            }
             fetchRoute();
         }
 
         function initGPS() {
-            navigator.geolocation.watchPosition((pos) => {
+            navigator.geolocation.watchPosition(pos => {
                 lastLat = pos.coords.latitude;
                 lastLng = pos.coords.longitude;
-                userHeading = pos.coords.heading || 0;
-
-                checkPresence(lastLat, lastLng);
-
-                if (document.getElementById('dwell-fill').style.width === "0%") {
-                    document.getElementById('gps-status').innerText = `GPS ACCURACY: ${pos.coords.accuracy.toFixed(1)}m`;
-                }
-
                 userMarker.setLatLng([lastLat, lastLng]);
-                
+                checkProximity(lastLat, lastLng);
+                document.getElementById('gps-status').innerText = "GPS ACTIVE (" + Math.round(pos.coords.accuracy) + "m)";
                 if (is3DMode) {
-                    const mapEl = document.getElementById('map');
-                    mapEl.style.transform = `rotateX(50deg) rotateZ(${-userHeading}deg) scale(1.3)`;
-                    if(!isUserMovingMap) map.panTo([lastLat, lastLng]);
+                    const head = pos.coords.heading || 0;
+                    document.getElementById('map').style.transform = `rotateX(50deg) rotateZ(${-head}deg) scale(1.3)`;
                 }
+            }, (err) => {
+                document.getElementById('gps-status').innerText = "GPS ERROR: " + err.message;
+            }, {
+                enableHighAccuracy: true,
+                maximumAge: 0,
+                timeout: 10000
+            });
+        }
 
-                if (!isUserMovingMap) fetchRoute();
-            }, null, { enableHighAccuracy: true });
+        function toggle3D() {
+            is3DMode = !is3DMode;
+            const mapEl = document.getElementById('map');
+            const btn = document.getElementById('go-btn');
+            if (is3DMode) {
+                mapEl.classList.add('map-3d');
+                btn.innerText = "EXIT";
+                btn.style.background = "var(--danger)";
+            } else {
+                mapEl.classList.remove('map-3d');
+                mapEl.style.transform = "none";
+                btn.innerText = "3D GO";
+                btn.style.background = "var(--success)";
+            }
         }
 
         function changeStop(dir) {
+            clearInterval(dwellTimer);
+            countdownActive = false;
+            document.getElementById('main-card').classList.remove('arrived-alert');
+            document.getElementById('dwell-fill').style.width = "0%";
             index = Math.max(0, Math.min(stops.length - 1, index + dir));
             updateUI();
         }
@@ -515,11 +480,6 @@
             const a = Math.sin(dLat/2)**2 + Math.cos(l1*Math.PI/180)*Math.cos(l2*Math.PI/180)*Math.sin(dLon/2)**2;
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
-
-        // Re-engage wake lock if app is minimized and brought back
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') stayAwake();
-        });
     </script>
 </body>
 </html>
