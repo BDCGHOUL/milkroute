@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Logistics Pro - Auto-Scheduler V5.1</title>
+    <title>Logistics Pro - V5.6 Full List + Stop Count</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -37,13 +37,19 @@
         #prog-fill { height: 100%; width: 0%; background: var(--accent); transition: width 0.3s; }
 
         .card { background: var(--card); border-radius: 12px; padding: 15px; margin-bottom: 10px; position: relative; overflow: hidden; }
-        .big-val { font-size: 48px; font-weight: 800; color: var(--success); line-height: 1; }
+        .big-val { font-size: 64px; font-weight: 800; color: var(--success); line-height: 1; }
         .addr-text { font-size: 20px; font-weight: 700; color: var(--accent); margin: 12px 0; min-height: 55px; text-align: center; }
         
         .arrived-alert { background: #1a321f !important; border: 2px solid var(--success); }
         
         .btn-group { display: flex; gap: 8px; }
         .btn-nav { flex: 1; border: none; padding: 18px; border-radius: 10px; font-weight: 700; font-size: 15px; }
+
+        #reset-btn {
+            position: absolute; top: 10px; right: 10px;
+            background: #333; color: var(--danger); border: 1px solid var(--danger);
+            padding: 4px 10px; border-radius: 6px; font-size: 10px; font-weight: 900; z-index: 20;
+        }
 
         #dwell-container { position: absolute; bottom: 0; left: 0; width: 100%; height: 8px; background: #333; z-index: 10; }
         #dwell-fill { height: 100%; width: 0%; background: var(--success); }
@@ -62,10 +68,10 @@
         .calc-input { width: 100%; background: #000; border: 1px solid #333; color: #fff; font-size: 26px; padding: 12px; border-radius: 8px; text-align: center; box-sizing: border-box; }
         #gps-status { font-size: 10px; color: #8e8e93; text-align: center; margin-top: 6px; font-weight: bold; }
         
-        .eta-box { text-align: right; color: var(--text-dim); font-size: 11px; font-weight: bold; }
+        .eta-box { text-align: right; color: var(--text-dim); font-size: 11px; font-weight: bold; margin-top: 10px; }
         #eta-val { color: var(--warning); font-size: 18px; display: block; }
         #dist-debug { font-size: 10px; color: var(--text-dim); position: absolute; top: 5px; left: 15px; }
-        #skip-msg { font-size: 10px; color: var(--warning); position: absolute; top: 5px; right: 15px; font-weight: bold; }
+        #skip-msg { font-size: 10px; color: var(--warning); position: absolute; top: 35px; right: 15px; font-weight: bold; }
         #run-indicator { color: var(--accent); font-weight: 900; letter-spacing: 1px; margin-bottom: 5px; font-size: 14px; }
     </style>
 </head>
@@ -80,7 +86,6 @@
         <div id="off-work-msg" style="display:none;">
             <h1 style="color: var(--success); font-size: 40px;">SATURDAY</h1>
             <h3>NO WORK TONIGHT</h3>
-            <p style="color: #8e8e93;">Enjoy your night off!</p>
         </div>
     </div>
 
@@ -98,15 +103,18 @@
     <div class="prog-bar"><div id="prog-fill"></div></div>
 
     <div class="card" id="main-card">
+        <button id="reset-btn" onclick="resetRoute()">RESET</button>
         <div id="dist-debug">DIST: --m</div>
         <div id="skip-msg"></div>
         <div style="display:flex; justify-content: space-between; align-items: flex-start;">
-            <div class="big-val" id="rem-count">0</div>
+            <div>
+                <div class="big-val" id="rem-count">0</div>
+                <div style="font-size: 10px; font-weight: 900; color: var(--text-dim); margin-left: 5px;">DROPS LEFT</div>
+            </div>
             <div class="eta-box">
-                <div id="run-indicator">VILLAGE</div>
-                NEXT STOP<br>
+                <div id="run-indicator">RUN</div>
+                ETA NEXT<br>
                 <span id="eta-val">--:--</span>
-                <span style="font-size: 9px; opacity: 0.7;">STOPS REMAINING</span>
             </div>
         </div>
         
@@ -138,10 +146,89 @@
     <script>
         // --- DATA SECTION ---
 
-        // >>> PASTE YOUR TOWN RUN STOPS HERE <<<
         const townStops = [
-            {addr: "Town Centre Start (Example)", lat: 52.238923, lng: 0.182703}, 
-            {addr: "Please Paste Town List In Code", lat: 52.239562, lng: 0.186159}
+            {addr: "4a Napier Street", lat: 52.20757, lng: 0.13391},
+			{addr: "17 Christchurch Street", lat: 52.20782, lng: 0.13303},
+			{addr: "13 Christchurch Street", lat: 52.20760, lng: 0.13307},
+			{addr: "34 Christchurch Street", lat: 52.20719, lng: 0.13311},
+			{addr: "3 Willow Walk", lat: 52.20717, lng: 0.12752},
+			{addr: "25 Brunswick Terrace", lat: 52.20895, lng: 0.13059},
+			{addr: "17 Brunswick Terrace", lat: 52.20875, lng: 0.13067},
+			{addr: "Ashtons Legal", lat: 52.20860, lng: 0.13666},
+			{addr: "5a St Matthew's Gardens", lat: 52.20685, lng: 0.14145},
+			{addr: "2 Ivy Court", lat: 52.20351, lng: 0.14381},
+			{addr: "116 Sleaford Street", lat: 52.20391, lng: 0.14395},
+			{addr: "Cambridge Women's Resource", lat: 52.20162, lng: 0.14021},
+			{addr: "22 Sturton Street", lat: 52.20176, lng: 0.14070},
+			{addr: "106 Sturton Street", lat: 52.20364, lng: 0.14053},
+			{addr: "127 Sturton Street", lat: 52.20445, lng: 0.14025},
+			{addr: "39b Abbey Walk", lat: 52.20560, lng: 0.14033},
+			{addr: "20 Geldart Street", lat: 52.20555, lng: 0.13893},
+			{addr: "5 Warkworth Street", lat: 52.20440, lng: 0.13027},
+			{addr: "39 Warkworth Street", lat: 52.20448, lng: 0.13006},
+			{addr: "26 Clarendon Street", lat: 52.20526, lng: 0.12827},
+			{addr: "21 Victoria Street", lat: 52.20488, lng: 0.12719},
+			{addr: "15 Elm Street", lat: 52.20596, lng: 0.12777},
+			{addr: "Lensfield Hotel", lat: 52.19807, lng: 0.12360},
+			{addr: "5 Pemberton Terrace", lat: 52.19692, lng: 0.12386},
+			{addr: "21 Brookside", lat: 52.19700, lng: 0.12271},
+			{addr: "6a Saxon Street", lat: 52.19776, lng: 0.12348},
+			{addr: "6 Tennis Court Road", lat: 52.20129, lng: 0.12145},
+			{addr: "Leverhulme", lat: 52.20066, lng: 0.12135},
+			{addr: "3 Summerfield", lat: 52.19816, lng: 0.11149},
+			{addr: "1b Summerfield", lat: 52.19833, lng: 0.11205},
+			{addr: "25 Chedworth Street", lat: 52.19521, lng: 0.11156},
+			{addr: "Newnham Nursery", lat: 52.19521, lng: 0.11156},
+			{addr: "49 Grantchester Street", lat: 52.19416, lng: 0.11065},
+			{addr: "32 Owlstone Road", lat: 52.19417, lng: 0.11132},
+			{addr: "35 Owlstone Road", lat: 52.19412, lng: 0.11136},
+			{addr: "50 Owlstone Road", lat: 52.19381, lng: 0.11147},
+			{addr: "53 Owlstone Road", lat: 52.19361, lng: 0.11155},
+			{addr: "23 Marlowe Road", lat: 52.19365, lng: 0.10797},
+			{addr: "39 Eltisley Avenue", lat: 52.19443, lng: 0.10954},
+			{addr: "24 Eltisley Avenue", lat: 52.19453, lng: 0.10965},
+			{addr: "29 Hardwick Street", lat: 52.19557, lng: 0.10891},
+			{addr: "14 Hardwick Street", lat: 52.19595, lng: 0.10894},
+			{addr: "31 Millington Road", lat: 52.19470, lng: 0.10513},
+			{addr: "102 Millington Lane", lat: 52.19411, lng: 0.10677},
+			{addr: "8 St Marks Court", lat: 52.19712, lng: 0.10654},
+			{addr: "15 St Marks Court", lat: 52.19764, lng: 0.10674},
+			{addr: "45 Selwyn Road", lat: 52.19579, lng: 0.10241},
+			{addr: "59 Selwyn Road", lat: 52.19583, lng: 0.10205},
+			{addr: "48b Selwyn Road", lat: 52.19585, lng: 0.10142},
+			{addr: "50 Selwyn Road", lat: 52.19586, lng: 0.10115},
+			{addr: "3 Fulbrooke Road", lat: 52.19551, lng: 0.09958},
+			{addr: "23 Fulbrooke Road", lat: 52.19563, lng: 0.09866},
+			{addr: "25 Fulbrooke Road", lat: 52.19564, lng: 0.09858},
+			{addr: "30 Fulbrooke Road", lat: 52.19566, lng: 0.09849},
+			{addr: "34 Fulbrooke Road", lat: 52.19569, lng: 0.09823},
+			{addr: "37 Fulbrooke Road", lat: 52.19569, lng: 0.09810},
+			{addr: "33 Grantchester Road", lat: 52.19597, lng: 0.10047},
+			{addr: "16 Grantchester Road", lat: 52.19614, lng: 0.10046},
+			{addr: "29 Grantchester Road", lat: 52.19619, lng: 0.10047},
+			{addr: "81 Barton Road", lat: 52.19762, lng: 0.09981},
+			{addr: "86b Barton Road", lat: 52.19797, lng: 0.09845},
+			{addr: "110 Barton Road", lat: 52.19855, lng: 0.09554},
+			{addr: "University Laundry Farm", lat: 52.19743, lng: 0.08728},
+			{addr: "12 Stukeley Close", lat: 52.19919, lng: 0.09693},
+			{addr: "15 Gough Way", lat: 52.19990, lng: 0.09745},
+			{addr: "41 Gough Way", lat: 52.19974, lng: 0.09465},
+			{addr: "66 Gough Way", lat: 52.20031, lng: 0.09439},
+			{addr: "67 Gough Way", lat: 52.20096, lng: 0.09441},
+			{addr: "77 Gough Way", lat: 52.20177, lng: 0.09457},
+			{addr: "79 Gough Way", lat: 52.20184, lng: 0.09462},
+			{addr: "4 Spens Avenue", lat: 52.19967, lng: 0.09938},
+			{addr: "57 Barton Road", lat: 52.19706, lng: 0.10232},
+			{addr: "11 Barton Close", lat: 52.19782, lng: 0.10267},
+			{addr: "13 Archway Court", lat: 52.19659, lng: 0.10310},
+			{addr: "Monkey Puzzle Nursery", lat: 52.19788, lng: 0.10484},
+			{addr: "Tyndale Lodge", lat: 52.19886, lng: 0.10357},
+			{addr: "5a Selwyn Gardens", lat: 52.19968, lng: 0.10283},
+			{addr: "4 Grange Court", lat: 52.20115, lng: 0.10422},
+			{addr: "4 Marleborough Court", lat: 52.20065, lng: 0.10239},
+			{addr: "5 Marleborough Court", lat: 52.20065, lng: 0.10239},
+			{addr: "9a Herschel Road", lat: 52.20473, lng: 0.10073},
+			{addr: "3 Adams Road", lat: 52.20614, lng: 0.10400},
         ];
 
         const villageStops = [
@@ -248,14 +335,9 @@
         const TRIGGER_DIST = 45; 
 
         window.onload = function() {
-            // --- DATE & SCHEDULE LOGIC ---
             const now = new Date();
-            
-            // 1. SCHEDULE LOGIC (Uses ACTUAL day, no rollover)
-            // This ensures if it's Wed 5pm, you still get Wed Run.
-            const scheduleDay = now.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+            const scheduleDay = now.getDay(); 
 
-            // 2. DISPLAY LOGIC (Uses 4PM rollover for paperwork/visuals only)
             const displayDate = new Date(now);
             if (now.getHours() >= 16) {
                 displayDate.setDate(now.getDate() + 1);
@@ -264,39 +346,29 @@
             document.getElementById('date-box').innerText = dateStr.toUpperCase();
             document.getElementById('day-display').innerText = now.toLocaleDateString('en-GB', { weekday: 'long' }).toUpperCase();
 
-            // ROUTE SELECTION
             const routeTitle = document.getElementById('route-title');
             const runInd = document.getElementById('run-indicator');
-            const content = document.getElementById('overlay-content');
-            const offMsg = document.getElementById('off-work-msg');
 
-            // 6 = Saturday (Off)
             if (scheduleDay === 6) {
-                content.style.display = 'none';
-                offMsg.style.display = 'block';
-                return; // Stop execution
+                document.getElementById('overlay-content').style.display = 'none';
+                document.getElementById('off-work-msg').style.display = 'block';
+                return;
             }
 
-            // 0=Sun, 2=Tue, 4=Thu -> VILLAGE RUN
             if (scheduleDay === 0 || scheduleDay === 2 || scheduleDay === 4) {
                 stops = villageStops;
-                routeTitle.innerText = "VILLAGE RUN V5.1";
-                runInd.innerText = "VILLAGE RUN";
-            }
-            // 1=Mon, 3=Wed, 5=Fri -> TOWN RUN
-            else if (scheduleDay === 1 || scheduleDay === 3 || scheduleDay === 5) {
+                routeTitle.innerText = "VILLAGE RUN V5.6";
+                runInd.innerText = "VILLAGE";
+            } else {
                 stops = townStops;
-                routeTitle.innerText = "TOWN RUN V5.1";
-                runInd.innerText = "TOWN RUN";
+                routeTitle.innerText = "TOWN RUN V5.6";
+                runInd.innerText = "TOWN";
             }
 
-            // RESUME LOGIC (Only if valid stops loaded)
-            if (stops.length > 0) {
-                const saved = localStorage.getItem('log_nav_idx');
-                if (saved !== null) {
-                    index = Math.min(parseInt(saved), stops.length - 1);
-                    document.getElementById('start-btn').innerText = "RESUME AT STOP " + (index + 1);
-                }
+            const saved = localStorage.getItem('log_nav_idx');
+            if (saved !== null) {
+                index = Math.min(parseInt(saved), stops.length - 1);
+                document.getElementById('start-btn').innerText = "RESUME AT STOP " + (index + 1);
             }
         };
 
@@ -308,11 +380,17 @@
             updateUI();
         }
 
+        function resetRoute() {
+            if (confirm("Reset route to Stop 1?")) {
+                index = 0;
+                localStorage.setItem('log_nav_idx', 0);
+                updateUI();
+            }
+        }
+
         function initMap() {
-            // Center map on first stop of current list
             let startLat = stops[0].lat;
             let startLng = stops[0].lng;
-            
             map = L.map('map', { zoomControl: false, attributionControl: false }).setView([startLat, startLng], 17);
             L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}').addTo(map);
             
@@ -336,13 +414,10 @@
         function checkProximity(lat, lng) {
             for (let i = index; i < stops.length; i++) {
                 let d = getDist(lat, lng, stops[i].lat, stops[i].lng);
-                
                 if (i === index) document.getElementById('dist-debug').innerText = `DIST: ${Math.round(d)}m`;
-
                 if (d < TRIGGER_DIST && !countdownActive) {
                     if (i > index) {
-                        let skippedCount = i - index;
-                        document.getElementById('skip-msg').innerText = `CLEARED ${skippedCount} PRIOR STOPS`;
+                        document.getElementById('skip-msg').innerText = `CLEARED ${i - index} STOPS`;
                         index = i; 
                     }
                     startHiddenCountdown();
@@ -355,15 +430,12 @@
             countdownActive = true;
             const mainCard = document.getElementById('main-card');
             const fill = document.getElementById('dwell-fill');
-            
             mainCard.classList.add('arrived-alert');
             if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
-
             let time = 0;
             dwellTimer = setInterval(() => {
                 time += 2; 
                 fill.style.width = time + "%";
-                
                 if (time >= 100) {
                     clearInterval(dwellTimer);
                     mainCard.classList.remove('arrived-alert');
@@ -386,39 +458,31 @@
                 if (data.routes && data.routes[0]) {
                     const route = data.routes[0];
                     routeLine.setLatLngs(route.geometry.coordinates.map(c => [c[1], c[0]]));
-                    
                     const arrival = new Date(Date.now() + route.duration * 1000);
                     document.getElementById('eta-val').innerText = arrival.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-                    
                     const remaining = stops.length - index;
                     const finish = new Date(Date.now() + (route.duration * 1.3 * 1000) + (remaining * 90000));
                     document.getElementById('wct-val').innerText = finish.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
                 }
-            } catch (e) { console.error("Routing error:", e); }
+            } catch (e) {}
         }
 
         function updateUI() {
             if (index >= stops.length) {
                 document.getElementById('next-addr').innerText = "ROUTE COMPLETE";
-                document.getElementById('eta-val').innerText = "--:--";
                 return;
             }
-            
             const current = stops[index];
             document.getElementById('next-addr').innerText = current.addr;
             document.getElementById('rem-count').innerText = stops.length - index;
             document.getElementById('prog-fill').style.width = ((index / stops.length) * 100) + "%";
             localStorage.setItem('log_nav_idx', index);
-            
             stopMarkers.forEach((m, i) => {
                 if (i === index) m.setStyle({fillColor: "#ff453a", radius: 10});
                 else if (i < index) m.setStyle({fillColor: "#444", radius: 5});
                 else m.setStyle({fillColor: "#ffd60a", radius: 6});
             });
-
-            if (!isUserMovingMap) {
-                map.setView([lastLat, lastLng], 17);
-            }
+            if (!isUserMovingMap) map.setView([lastLat, lastLng], 17);
             fetchRoute();
         }
 
@@ -429,17 +493,7 @@
                 userMarker.setLatLng([lastLat, lastLng]);
                 checkProximity(lastLat, lastLng);
                 document.getElementById('gps-status').innerText = "GPS ACTIVE (" + Math.round(pos.coords.accuracy) + "m)";
-                if (is3DMode) {
-                    const head = pos.coords.heading || 0;
-                    document.getElementById('map').style.transform = `rotateX(50deg) rotateZ(${-head}deg) scale(1.3)`;
-                }
-            }, (err) => {
-                document.getElementById('gps-status').innerText = "GPS ERROR: " + err.message;
-            }, {
-                enableHighAccuracy: true,
-                maximumAge: 0,
-                timeout: 10000
-            });
+            }, null, { enableHighAccuracy: true });
         }
 
         function toggle3D() {
