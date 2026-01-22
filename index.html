@@ -109,16 +109,15 @@
             <div style="font-size: 10px; font-weight: 900; color: var(--text-dim);">DROPS LEFT</div>
         </div>
         
-        <div class="eta-box">
-            <div id="run-indicator" style="font-size: 12px; font-weight: 900; margin-bottom: 4px;">RUN</div>
-            <div style="color: #888; font-size: 9px;">EST. FINISH</div>
-            <div id="worst-case" style="color: var(--danger); font-size: 18px; font-weight: 800;">--:--</div>
-            
-            <div style="margin-top: 5px; line-height: 1.1;">
-                <span style="font-size: 9px; color: #888;">ETA NEXT</span><br>
-                <span id="eta-val" style="color: var(--warning); font-size: 16px; font-weight: 700;">--:--</span>
-            </div>
-        </div>
+        <div class="eta-box" style="display: flex; flex-direction: column; align-items: flex-end;">
+    <div style="color: var(--danger); font-size: 9px; font-weight: 900;">WORST CASE</div>
+    <div id="worst-case" style="color: var(--danger); font-size: 22px; font-weight: 900; line-height: 1;">--:--</div>
+    
+    <div style="margin-top: 8px; text-align: right;">
+        <div style="color: var(--text-dim); font-size: 9px;">ETA NEXT</div>
+        <div id="eta-val" style="color: var(--warning); font-size: 16px; font-weight: 700;">--:--</div>
+    </div>
+</div>
     </div>
     
     <div id="next-addr" class="addr-text">GPS Loading...</div>
@@ -549,78 +548,47 @@
         }, null, { enableHighAccuracy: true });
     }
 
-// --- 5. NAV & ALL-STOP ESTIMATE (1.4x Multiplier) ---
-async function fetchRoute() {
-    const remainingStops = stops.slice(index); 
-    const estFinishElem = document.getElementById('worst-case');
-    const etaNextElem = document.getElementById('eta-val');
+async function fetchRoute(userLat, userLng) {
+    if (!stops[index]) return;
+    const target = stops[index];
     
-    if (remainingStops.length === 0) return;
-
-    const now = Date.now();
-    // Immediate baseline so no dashes appear
-    const baselineFinish = new Date(now + (remainingStops.length * 120 * 1000));
-    if (estFinishElem) {
-        estFinishElem.innerText = baselineFinish.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-    }
-
-    if (lastLat === null || lastLng === null) return;
-
+    const url = `https://router.project-osrm.org/route/v1/driving/${userLng},${userLat};${target.lng},${target.lat}?overview=full&geometries=geojson`;
+    
     try {
-        // Build coordinates for ALL stops to get total time
-        const coords = `${lastLng},${lastLat};` + 
-                       remainingStops.map(s => `${s.lng},${s.lat}`).join(';');
-
-        const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&steps=true`;
-        const res = await fetch(url);
-        const data = await res.json();
+        const response = await fetch(url);
+        const data = await response.json();
         
         if (data.routes && data.routes[0]) {
             const route = data.routes[0];
+            routeLine.setLatLngs(route.geometry.coordinates.map(c => [c[1], c[0]]));
+
+            // 1. ETA NEXT (Driving time to next house)
+            const driveSecs = route.duration;
+            const etaNext = new Date(Date.now() + (driveSecs * 1000));
+            document.getElementById('eta-val').innerText = etaNext.toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'});
+
+            // 2. WORST CASE FINISH (Strict 2m per drop + 1.4x Driving)
+            const remainingStops = stops.length - index;
             
-            // --- THE MAP FIX: ONLY DRAW LEG 0 ---
-            // This filters the geometry to only show the path to the NEXT stop
-            // while still using the full route duration for the math below.
-            const nextStopSteps = route.legs[0].steps;
-            const nextStopCoords = [];
-            nextStopSteps.forEach(step => {
-                step.intersections.forEach(inter => {
-                    nextStopCoords.push([inter.location[1], inter.location[0]]);
-                });
+            // Assume 2.5 mins average drive between village stops (x 1.4 safety)
+            const estDrivePerStop = 150 * 1.4; 
+            // Your strict 2-minute max per drop (120 seconds)
+            const servicePerStop = 120; 
+            
+            const totalSecondsRemaining = remainingStops * (estDrivePerStop + servicePerStop);
+            
+            const finishTime = new Date(Date.now() + (totalSecondsRemaining * 1000));
+            
+            // Format to 24hr (en-GB forces the 04:00 style instead of 1:00 PM style)
+            document.getElementById('worst-case').innerText = finishTime.toLocaleTimeString('en-GB', {
+                hour: '2-digit', 
+                minute: '2-digit'
             });
-            routeLine.setLatLngs(nextStopCoords);
 
-            // --- THE MATH (1.4x Multiplier for the whole night) ---
-            const totalDrivingSeconds = route.duration;
-            const bufferedDrivingSeconds = totalDrivingSeconds * 1.4; 
-            const totalServiceSeconds = remainingStops.length * 120; 
-            
-            const totalSecondsTillFinish = bufferedDrivingSeconds + totalServiceSeconds;
-
-            // UPDATE EST. FINISH
-            const finalFinish = new Date(now + (totalSecondsTillFinish * 1000));
-            if (estFinishElem) {
-                estFinishElem.innerText = finalFinish.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-            }
-
-            // UPDATE ETA NEXT (First leg only x 1.4 + 2 mins)
-            const firstLegSeconds = (route.legs[0].duration * 1.4) + 120;
-            const nextETA = new Date(now + (firstLegSeconds * 1000));
-            if (etaNextElem) {
-                etaNextElem.innerText = nextETA.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-            }
-
-            // DIRECTIONS (Leg 0 only)
-            const steps = route.legs[0].steps;
-            let dirText = "HEAD TOWARD STOP";
-            if (steps.length > 1) {
-                const t = steps[1]; 
-                dirText = `IN ${Math.round(t.distance)}m: TAKE ${t.maneuver.modifier || 'TURN'} ONTO ${t.name || 'ROAD'}`;
-            }
-            document.getElementById('direction-text').innerText = dirText.toUpperCase();
+            document.getElementById('dist-debug').innerText = `DIST: ${Math.round(route.distance)}m`;
         }
-    } catch (e) { 
-        console.error("Route Logic Error:", e); 
+    } catch (e) {
+        console.error("GPS Update Error:", e);
     }
 }
 
