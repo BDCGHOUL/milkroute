@@ -100,39 +100,36 @@
     <div class="prog-bar"><div id="prog-fill"></div></div>
 
     <div class="card" id="main-card">
-	
-        <div id="dist-debug">DIST: --m</div>
-        <div id="skip-msg"></div>
-        <div style="display:flex; justify-content: space-between; align-items: flex-start;">
-    <div>
-        <div class="big-val" id="rem-count">0</div>
-        <div style="font-size: 10px; font-weight: 900; color: var(--text-dim); margin-left: 5px;">
-            DROPS LEFT
+    <div id="dist-debug" style="position: absolute; top: 5px; left: 10px; font-size: 10px; color: var(--text-dim);">DIST: --m</div>
+    <div id="skip-msg" style="position: absolute; top: 5px; right: 10px; font-size: 10px; color: var(--warning);"></div>
+
+    <div style="display:flex; justify-content: space-between; align-items: flex-start; margin-top: 10px;">
+        <div>
+            <div class="big-val" id="rem-count">0</div>
+            <div style="font-size: 10px; font-weight: 900; color: var(--text-dim);">DROPS LEFT</div>
+        </div>
+        
+        <div class="eta-box">
+            <div id="run-indicator" style="font-size: 12px; font-weight: 900; margin-bottom: 4px;">RUN</div>
+            <div style="color: #888; font-size: 9px;">EST. FINISH</div>
+            <div id="worst-case" style="color: var(--danger); font-size: 18px; font-weight: 800;">--:--</div>
+            
+            <div style="margin-top: 5px; line-height: 1.1;">
+                <span style="font-size: 9px; color: #888;">ETA NEXT</span><br>
+                <span id="eta-val" style="color: var(--warning); font-size: 16px; font-weight: 700;">--:--</span>
+            </div>
         </div>
     </div>
     
-    <div class="eta-box" style="text-align: right;">
-        <div id="run-indicator">RUN</div>
-        
-        <div style="font-size: 10px; color: #888;">EST. FINISH</div>
-        <div id="worst-case" style="color: #ff453a; font-weight: bold; font-size: 16px;">--:--</div>
-        
-        <div style="margin-top: 5px;">
-            ETA NEXT<br>
-            <span id="eta-val">--:--</span>
-        </div>
+    <div id="next-addr" class="addr-text">GPS Loading...</div>
+
+    <div class="btn-group">
+        <button class="btn-nav" style="background:#2c2c2e; color:white;" onclick="changeStop(-1)">BACK</button>
+        <button class="btn-nav" style="background:var(--accent); color:white;" onclick="changeStop(1)">SKIP</button>
     </div>
+
+    <div id="dwell-container"><div id="dwell-fill"></div></div>
 </div>
-        
-        <div id="next-addr" class="addr-text">GPS Loading...</div>
-
-        <div class="btn-group">
-            <button class="btn-nav" style="background:#2c2c2e; color:white;" onclick="changeStop(-1)">BACK</button>
-            <button class="btn-nav" style="background:var(--accent); color:white;" onclick="changeStop(1)">SKIP</button>
-        </div>
-
-        <div id="dwell-container"><div id="dwell-fill"></div></div>
-    </div>
 
    <div id="map-container">
 
