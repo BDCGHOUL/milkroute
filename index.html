@@ -414,7 +414,7 @@
         if (navigator.vibrate) navigator.vibrate([200, 100, 200]); 
         let time = 0;
         dwellTimer = setInterval(() => {
-            time += 2; 
+            time += 1; 
             document.getElementById('dwell-fill').style.width = time + "%";
             if (time >= 100) {
                 clearInterval(dwellTimer);
