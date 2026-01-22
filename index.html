@@ -147,8 +147,29 @@
         position: absolute; 
         top: 10px; 
         right: 10px; 
-        z-index: 1001;">
+        z-index: 1001;
+        background: var(--success); 
+        color: black; 
+        border: none; 
+        padding: 10px 20px; 
+        border-radius: 25px; 
+        font-weight: 900;">
         GO
+    </button>
+
+    <button id="calc-toggle-btn" onclick="toggleCalc()" style="
+        position: absolute; 
+        bottom: 20px; 
+        left: 10px; 
+        z-index: 1001; 
+        background: var(--warning); 
+        color: black; 
+        border: none; 
+        padding: 10px 15px; 
+        border-radius: 8px; 
+        font-weight: bold;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+        CALCULATOR
     </button>
 
     <div id="map" style="height: 100%; width: 100%;"></div>
@@ -156,12 +177,55 @@
     
     <div id="gps-status">GPS STANDBY</div>
 
-    <div id="calc-panel" class="card" style="margin-top: 10px;">
-    <input type="number" id="calc-in" class="calc-input" placeholder="Enter Total Items" oninput="doCalc()">
-    <div class="calc-grid">
-        <div><span id="p-out" style="color:var(--success); font-size: 28px; font-weight: 800;">0</span><br><small>PACKS</small></div>
-        <div><span id="l-out" style="color:var(--warning); font-size: 28px; font-weight: 800;">0</span><br><small>LOOSE</small></div>
+    <div id="calc-backdrop" onclick="toggleCalc()" style="
+    display: none; 
+    position: fixed; 
+    top: 0; left: 0; 
+    width: 100%; height: 100%; 
+    background: rgba(0,0,0,0.85); 
+    z-index: 1999; 
+    backdrop-filter: blur(2px);">
+</div>
+
+<div id="calc-panel" class="card" style="
+    display: none; 
+    position: fixed; 
+    top: 50%; left: 50%; 
+    transform: translate(-50%, -50%); 
+    width: 85%; max-width: 320px; 
+    z-index: 2000; 
+    border: 2px solid var(--warning); 
+    box-shadow: 0 0 30px rgba(0,0,0,0.8);">
+    
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <h2 style="margin: 0; color: var(--warning); font-size: 20px;">CALCULATOR</h2>
+        <button onclick="toggleCalc()" style="background: #333; color: #888; border: none; padding: 5px 12px; border-radius: 5px; font-weight: bold; font-size: 16px;">X</button>
     </div>
+
+    <input type="number" id="calc-in" class="calc-input" placeholder="Total Items" oninput="doCalc()" style="border: 1px solid var(--text-dim);">
+    
+    <div class="calc-grid" style="margin: 20px 0;">
+        <div style="background: #111; padding: 10px; border-radius: 8px;">
+            <span id="p-out" style="color:var(--success); font-size: 32px; font-weight: 800;">0</span><br>
+            <small style="color:#888;">PACKS</small>
+        </div>
+        <div style="background: #111; padding: 10px; border-radius: 8px;">
+            <span id="l-out" style="color:var(--warning); font-size: 32px; font-weight: 800;">0</span><br>
+            <small style="color:#888;">LOOSE</small>
+        </div>
+    </div>
+
+    <button onclick="toggleCalc()" style="
+        width: 100%; 
+        padding: 15px; 
+        background: var(--warning); 
+        color: black; 
+        font-weight: 900; 
+        font-size: 18px; 
+        border: none; 
+        border-radius: 8px;">
+        DONE
+    </button>
 </div>
 	
 	
@@ -378,50 +442,49 @@
     
     const TRIGGER_DIST = 7; // Slightly wider to help with "Skip Ahead" detection
 
-    // --- 3. APP INITIALIZATION (4 PM LOGIC) ---
     window.onload = function() {
         const now = new Date();
         let bizDate = new Date(now);
         
-        // If it's before 4 PM, we are still on "Yesterday's" shift
-        if (now.getHours() < 16) {
+        // Keep it on "Thursday Night" until 9 AM Friday
+        if (now.getHours() < 9) {
             bizDate.setDate(now.getDate() - 1);
         }
 
         const scheduleDay = bizDate.getDay(); 
         const routeTitle = document.getElementById('route-title');
         const runInd = document.getElementById('run-indicator');
-        const calcPanel = document.getElementById('calc-panel');
+        const calcBtn = document.getElementById('calc-toggle-btn');
 
-        // Display the "Shift Date" (The night the work started)
-        document.getElementById('date-box').innerText = bizDate.toLocaleDateString('en-GB', { 
-            weekday: 'short', day: 'numeric', month: 'short' 
-        }).toUpperCase();
-        
-        document.getElementById('day-display').innerText = bizDate.toLocaleDateString('en-GB', { 
-            weekday: 'long' 
-        }).toUpperCase();
+        document.getElementById('date-box').innerText = bizDate.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }).toUpperCase();
+        document.getElementById('day-display').innerText = bizDate.toLocaleDateString('en-GB', { weekday: 'long' }).toUpperCase();
 
-        // Saturday Night (Shift starting Sat 4pm) = Off
         if (scheduleDay === 6) {
             document.getElementById('overlay-content').style.display = 'none';
             document.getElementById('off-work-msg').style.display = 'block';
             return;
         }
 
-        // Village = Sun(0), Tue(2), Thu(4) | Town = Mon(1), Wed(3), Fri(5)
+        // Logic based on your specific schedule
         const isVillageNight = (scheduleDay === 0 || scheduleDay === 2 || scheduleDay === 4);
         stops = isVillageNight ? villageStops : townStops;
         
-        routeTitle.innerText = isVillageNight ? "VILLAGE RUN" : "TOWN RUN";
-        runInd.innerText = isVillageNight ? "VILLAGE" : "TOWN";
+        if (routeTitle) routeTitle.innerText = isVillageNight ? "VILLAGE RUN" : "TOWN RUN";
+        if (runInd) {
+            runInd.innerText = isVillageNight ? "VILLAGE" : "TOWN";
+            runInd.style.color = isVillageNight ? "#ff453a" : "#0a84ff";
+        }
 
-        if (calcPanel) calcPanel.style.display = isVillageNight ? 'block' : 'none';
+        // Only show the CALC button on map if it's a Village night
+        if (calcBtn) calcBtn.style.display = isVillageNight ? 'block' : 'none';
 
         const saved = localStorage.getItem('log_nav_idx');
+        const startBtn = document.getElementById('start-btn');
         if (saved !== null && stops.length > 0) {
             index = Math.min(parseInt(saved), stops.length - 1);
-            document.getElementById('start-btn').innerText = "RESUME AT STOP " + (index + 1);
+            startBtn.innerText = "RESUME AT STOP " + (index + 1);
+        } else {
+            startBtn.innerText = stops.length > 0 ? "START WORK" : "NO STOPS FOUND";
         }
     };
 
@@ -626,6 +689,34 @@ async function fetchRoute() {
             updateUI();
         }
     }
+	
+	function toggleCalc() {
+    const panel = document.getElementById('calc-panel');
+    const backdrop = document.getElementById('calc-backdrop');
+    const inputField = document.getElementById('calc-in');
+    
+    // Check if hidden
+    const isHidden = (panel.style.display === 'none' || panel.style.display === '');
+
+    if (isHidden) {
+        // OPEN IT
+        panel.style.display = 'block';
+        backdrop.style.display = 'block';
+        
+        // Reset the input value for a fresh calculation? 
+        // Remove the next line if you want to keep the old numbers.
+        inputField.value = ''; 
+        document.getElementById('p-out').innerText = '0';
+        document.getElementById('l-out').innerText = '0';
+
+        // Focus the keyboard automatically
+        setTimeout(() => { inputField.focus(); }, 100);
+    } else {
+        // CLOSE IT
+        panel.style.display = 'none';
+        backdrop.style.display = 'none';
+    }
+}
 </script>
 </body>
 </html>
