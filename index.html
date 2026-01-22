@@ -673,17 +673,19 @@ async function fetchRoute() {
     }
 
     function changeStop(dir) {
-    index += dir;
-    if (index < 0) index = 0;
-    if (index >= stops.length) index = stops.length - 1;
-    
-    updateUI();
-    
-    // Trigger navigation only when moving forward
-    if (dir > 0) {
-        openNav();
+        index += dir;
+        if (index < 0) index = 0;
+        if (index >= stops.length) index = stops.length - 1;
+        
+        updateUI();
+        saveProgress();
+    }
+
+function toggle3D() {
+        const s = stops[index];
+        const url = `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}&travelmode=driving`;
+        window.open(url, '_blank');
     }
-}
 
     function doCalc() {
         let v = document.getElementById('calc-in').value;
