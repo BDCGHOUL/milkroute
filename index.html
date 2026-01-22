@@ -268,22 +268,33 @@
     let isUserMovingMap = false;
     let countdownActive = false;
     
-    const TRIGGER_DIST = 5; 
+    const TRIGGER_DIST = 7; // Slightly wider to help with "Skip Ahead" detection
 
-    // --- 3. APP INITIALIZATION ---
+    // --- 3. APP INITIALIZATION (4 PM LOGIC) ---
     window.onload = function() {
         const now = new Date();
-        const scheduleDay = now.getDay(); 
+        let bizDate = new Date(now);
+        
+        // If it's before 4 PM, we are still on "Yesterday's" shift
+        if (now.getHours() < 16) {
+            bizDate.setDate(now.getDate() - 1);
+        }
+
+        const scheduleDay = bizDate.getDay(); 
         const routeTitle = document.getElementById('route-title');
         const runInd = document.getElementById('run-indicator');
         const calcPanel = document.getElementById('calc-panel');
 
-        // Date Setup
-        const displayDate = new Date(now);
-        if (now.getHours() >= 16) displayDate.setDate(now.getDate() + 1);
-        document.getElementById('date-box').innerText = displayDate.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }).toUpperCase();
-        document.getElementById('day-display').innerText = now.toLocaleDateString('en-GB', { weekday: 'long' }).toUpperCase();
+        // Display the "Shift Date" (The night the work started)
+        document.getElementById('date-box').innerText = bizDate.toLocaleDateString('en-GB', { 
+            weekday: 'short', day: 'numeric', month: 'short' 
+        }).toUpperCase();
+        
+        document.getElementById('day-display').innerText = bizDate.toLocaleDateString('en-GB', { 
+            weekday: 'long' 
+        }).toUpperCase();
 
+        // Saturday Night (Shift starting Sat 4pm) = Off
         if (scheduleDay === 6) {
             document.getElementById('overlay-content').style.display = 'none';
             document.getElementById('off-work-msg').style.display = 'block';
@@ -297,10 +308,7 @@
         routeTitle.innerText = isVillageNight ? "VILLAGE RUN" : "TOWN RUN";
         runInd.innerText = isVillageNight ? "VILLAGE" : "TOWN";
 
-        // CALCULATOR TOGGLE - Explicitly check if it exists before styling
-        if (calcPanel) {
-            calcPanel.style.display = isVillageNight ? 'block' : 'none';
-        }
+        if (calcPanel) calcPanel.style.display = isVillageNight ? 'block' : 'none';
 
         const saved = localStorage.getItem('log_nav_idx');
         if (saved !== null && stops.length > 0) {
@@ -333,17 +341,8 @@
         routeLine = L.polyline([], { color: '#0a84ff', weight: 8, opacity: 0.8 }).addTo(map);
         userMarker = L.circleMarker([0,0], { radius: 10, fillColor: "#fff", color: "#0a84ff", weight: 4, fillOpacity: 1 }).addTo(map);
         
-        map.on('movestart', () => {
-            isUserMovingMap = true;
-            clearTimeout(recenterTimer);
-        });
-
-        map.on('moveend', () => {
-            recenterTimer = setTimeout(() => {
-                isUserMovingMap = false;
-                recenterView();
-            }, 10000); 
-        });
+        map.on('movestart', () => { isUserMovingMap = true; clearTimeout(recenterTimer); });
+        map.on('moveend', () => { recenterTimer = setTimeout(() => { isUserMovingMap = false; recenterView(); }, 10000); });
     }
 
     function recenterView() {
@@ -357,14 +356,25 @@
             lastLat = pos.coords.latitude;
             lastLng = pos.coords.longitude;
             userMarker.setLatLng([lastLat, lastLng]);
-            checkProximity(lastLat, lastLng);
+            
+            // SMART SCAN: Check all remaining stops to see if we've skipped ahead
+            for (let i = index; i < stops.length; i++) {
+                let d = getDist(lastLat, lastLng, stops[i].lat, stops[i].lng);
+                if (d < TRIGGER_DIST && !countdownActive) {
+                    // If we found a match further down the list, jump to it
+                    index = i; 
+                    startHiddenCountdown();
+                    break;
+                }
+            }
+
             document.getElementById('gps-status').innerText = `GPS ACTIVE (${Math.round(pos.coords.accuracy)}m)`;
             if (!isUserMovingMap) recenterView();
             fetchRoute();
         }, null, { enableHighAccuracy: true });
     }
 
-    // --- 5. UPDATED NAVIGATION & 2-MINUTE WORST CASE ---
+    // --- 5. NAV & 2-MIN DROPS ---
     async function fetchRoute() {
         const dest = stops[index];
         if (!dest || !lastLat) return;
@@ -377,40 +387,27 @@
                 const route = data.routes[0];
                 routeLine.setLatLngs(route.geometry.coordinates.map(c => [c[1], c[0]]));
                 
-                // 1. Directions
+                // Directions
                 const steps = route.legs[0].steps;
-                let directionText = "HEAD TOWARD STOP";
+                let dirText = "HEAD TOWARD STOP";
                 if (steps.length > 1) {
-                    const nextTurn = steps[1]; 
-                    directionText = `IN ${Math.round(nextTurn.distance)}m: TAKE ${nextTurn.maneuver.modifier || 'TURN'} ONTO ${nextTurn.name || 'ROAD'}`;
+                    const t = steps[1]; 
+                    dirText = `IN ${Math.round(t.distance)}m: TAKE ${t.maneuver.modifier || 'TURN'} ONTO ${t.name || 'ROAD'}`;
                 }
-                document.getElementById('direction-text').innerText = directionText.toUpperCase();
+                document.getElementById('direction-text').innerText = dirText.toUpperCase();
 
-                // 2. ETA (Time to next stop)
-                const nextStopETA = new Date(Date.now() + (route.duration * 1000));
-                document.getElementById('eta-val').innerText = nextStopETA.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                // ETA & Worst Case (2 mins per drop)
+                const nextETA = new Date(Date.now() + (route.duration * 1000));
+                document.getElementById('eta-val').innerText = nextETA.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
 
-                // 3. WORST CASE (2 mins per drop + driving)
-                const dropsRemaining = stops.length - index;
-                const driveTimeSecs = route.duration;
-                const dropTimeSecs = dropsRemaining * 120; // 120 seconds = 2 minutes
-                
-                const worstCaseTime = new Date(Date.now() + ((driveTimeSecs + dropTimeSecs) * 1000));
-                document.getElementById('worst-case').innerText = worstCaseTime.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                const dropsRem = stops.length - index;
+                const worstCase = new Date(Date.now() + ((route.duration + (dropsRem * 120)) * 1000));
+                document.getElementById('worst-case').innerText = worstCase.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
             }
-        } catch (e) { 
-            console.error("Routing error:", e); 
-        }
+        } catch (e) { console.error(e); }
     }
 
-    // --- 6. CORE LOGIC ---
-    function checkProximity(lat, lng) {
-        if (countdownActive || !stops[index]) return;
-        let d = getDist(lat, lng, stops[index].lat, stops[index].lng);
-        document.getElementById('dist-debug').innerText = `DIST: ${Math.round(d)}m`;
-        if (d < TRIGGER_DIST) startHiddenCountdown();
-    }
-
+    // --- 6. CORE APP LOGIC ---
     function startHiddenCountdown() {
         countdownActive = true;
         document.getElementById('main-card').classList.add('arrived-alert');
@@ -423,7 +420,7 @@
                 clearInterval(dwellTimer);
                 document.getElementById('main-card').classList.remove('arrived-alert');
                 document.getElementById('dwell-fill').style.width = "0%";
-                index++;
+                index++; // Move to the NEXT stop after the one we just arrived at
                 countdownActive = false;
                 updateUI();
             }
@@ -433,17 +430,14 @@
     function updateUI() {
         if (index >= stops.length) {
             document.getElementById('next-addr').innerText = "ROUTE COMPLETE";
-            document.getElementById('direction-text').innerText = "FINISHED";
             document.getElementById('rem-count').innerText = "0";
-            document.getElementById('eta-val').innerText = "--:--";
-            document.getElementById('worst-case').innerText = "--:--";
-            routeLine.setLatLngs([]);
             return;
         }
         document.getElementById('next-addr').innerText = stops[index].addr;
         document.getElementById('rem-count').innerText = stops.length - index;
         document.getElementById('prog-fill').style.width = ((index / stops.length) * 100) + "%";
         localStorage.setItem('log_nav_idx', index);
+        
         stopMarkers.forEach((m, i) => {
             if (i === index) m.setStyle({fillColor: "#ff453a", radius: 10});
             else if (i < index) m.setStyle({fillColor: "#444", radius: 5});
@@ -465,7 +459,6 @@
         clearInterval(dwellTimer);
         countdownActive = false;
         document.getElementById('main-card').classList.remove('arrived-alert');
-        document.getElementById('dwell-fill').style.width = "0%";
         index = Math.max(0, Math.min(stops.length - 1, index + dir));
         updateUI();
     }
