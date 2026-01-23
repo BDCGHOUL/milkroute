@@ -616,6 +616,7 @@
     let isUserMovingMap = false;
     let countdownActive = false;
 	let isAdmin = false;
+	let batchNewStops = [];
     let markersMoved = false;
 	
     const TRIGGER_DIST = 7; // Slightly wider to help with "Skip Ahead" detection
@@ -1045,65 +1046,117 @@ function downloadUpdates() {
 }
 
 function prepareNewStop() {
-    if (!navigator.geolocation) {
-        alert("GPS is not supported by this browser.");
+    if (!isAdmin) {
+        // NON-ADMINS: Only one auto-located call, then email
+        autoLocateNewStop();
         return;
     }
 
-    // Feedback for the user
-    const originalText = document.getElementById('add-stop-btn').innerText;
-    document.getElementById('add-stop-btn').innerText = "⌛";
+    // ADMIN: Choice between GPS or Manual Batching
+    const mode = confirm("ADMIN MODE:\n\nOK - Auto-Locate (Single)\nCancel - Manual Batch Entry");
+
+    if (mode) {
+        autoLocateNewStop();
+    } else {
+        manualBatchEntry();
+    }
+}
+
+function autoLocateNewStop() {
+    if (!navigator.geolocation) {
+        alert("GPS not supported.");
+        return;
+    }
+    
+    const addBtn = document.getElementById('add-stop-btn');
+    addBtn.innerText = "⌛";
 
     navigator.geolocation.getCurrentPosition((position) => {
-        document.getElementById('add-stop-btn').innerText = "+";
+        addBtn.innerText = "+";
         const lat = parseFloat(position.coords.latitude.toFixed(6));
         const lng = parseFloat(position.coords.longitude.toFixed(6));
-
-        const houseInfo = prompt(`Location Captured!\nLat: ${lat}\nLng: ${lng}\n\nEnter House Number/Name:`);
-
-        if (houseInfo) {
-            if (isAdmin) {
-                // ADMIN FEATURE: Add it directly to the map right now
-                const newStop = { addr: houseInfo, lat: lat, lng: lng };
-                stops.push(newStop);
-                
-                let newMarker = L.marker([lat, lng], {
-                    draggable: true,
-                    riseOnHover: true
-                }).addTo(map);
-                
-                newMarker.bindTooltip(houseInfo);
-                
-                // Add the same dragging logic we use for existing markers
-                newMarker.on('dragend', (e) => {
-                    const pos = e.target.getLatLng();
-                    newStop.lat = parseFloat(pos.lat.toFixed(6));
-                    newStop.lng = parseFloat(pos.lng.toFixed(6));
-                    showSaveButton();
-                });
-
-                stopMarkers.push(newMarker);
-                markersMoved = true;
-                showSaveButton();
-                alert(`${houseInfo} added to map! Use the SAVE button to get the updated code.`);
-            } else {
-                // REGULAR USER: Send for confirmation
-                submitToAdmin(houseInfo, lat, lng);
-            }
+        
+        if (isAdmin) {
+            processInstantStop(lat, lng);
+        } else {
+            // Standard User flow
+            const name = prompt("Location Captured! Enter House Number/Name:");
+            if (name) submitToAdmin(name, lat, lng);
         }
-    }, (err) => {
-        document.getElementById('add-stop-btn').innerText = "+";
-        alert("GPS Error: Please ensure location services are enabled.");
+    }, () => {
+        addBtn.innerText = "+";
+        alert("GPS Error.");
     });
 }
 
+// --- ADMIN MANUAL BATCH LOGIC ---
+function manualBatchEntry() {
+    // 1. Lat Input (Fixed 52.)
+    let latSuffix = prompt(`[BATCH ITEM ${batchNewStops.length + 1}]\nEnter 6 digits for Latitude: 52.______\n(Or leave blank if finished)`);
+    if (!latSuffix) {
+        if (batchNewStops.length > 0) finalizeAdminBatch();
+        return;
+    }
+
+    // 2. Lon Input (Fixed 0.)
+    let lngSuffix = prompt(`Enter 6 digits for Longitude: 0.______`);
+    if (!lngSuffix) return;
+
+    // Validation
+    if (latSuffix.length === 6 && lngSuffix.length === 6 && !isNaN(latSuffix) && !isNaN(lngSuffix)) {
+        const lat = parseFloat("52." + latSuffix);
+        const lng = parseFloat("0." + lngSuffix);
+        const name = prompt("Enter House Number/Name:");
+
+        if (name) {
+            // Add to the map instantly so you can see it
+            const newStop = { addr: name, lat: lat, lng: lng };
+            batchNewStops.push(newStop);
+            stops.push(newStop);
+            
+            let m = L.marker([lat, lng], { draggable: true }).addTo(map);
+            m.bindTooltip(name);
+            stopMarkers.push(m);
+            
+            // Loop for the next one
+            const next = confirm("Stop Added! Add another to the batch?\n\nOK - Yes\nCancel - Done & Save All");
+            if (next) {
+                manualBatchEntry();
+            } else {
+                finalizeAdminBatch();
+            }
+        }
+    } else {
+        alert("Invalid format. Exactly 6 digits required after the dot.");
+        manualBatchEntry(); // Retry
+    }
+}
+
+function finalizeAdminBatch() {
+    alert(`Batch complete. ${batchNewStops.length} new calls added to the map.`);
+    markersMoved = true;
+    showSaveButton(); // Trigger the .txt download button
+    batchNewStops = []; // Clear for next session
+}
+
+function processInstantStop(lat, lng) {
+    const name = prompt("Enter House Number/Name:");
+    if (name) {
+        const newStop = { addr: name, lat: lat, lng: lng };
+        stops.push(newStop);
+        let m = L.marker([lat, lng], { draggable: true }).addTo(map);
+        m.bindTooltip(name);
+        stopMarkers.push(m);
+        markersMoved = true;
+        showSaveButton();
+    }
+}
+
 function submitToAdmin(name, lat, lng) {
-    const newStopCode = `{addr: "${name}", lat: ${lat}, lng: ${lng}},`;
-    const subject = encodeURIComponent("NEW CALL REQUEST: " + name);
-    const body = encodeURIComponent("Please confirm and add this location to the route:\n\n" + newStopCode);
-    
+    const code = `{addr: "${name}", lat: ${lat}, lng: ${lng}},`;
+    const subject = encodeURIComponent("New Call: " + name);
+    const body = encodeURIComponent("Please add this to the route:\n\n" + code);
     window.location.href = `mailto:2000abw@gmail.com?subject=${subject}&body=${body}`;
-    alert("Request generated. Please hit 'Send' on the email to notify the admin.");
 }
 
 // Ensure tooltips are active on load (Call this after stopMarkers array is filled)
