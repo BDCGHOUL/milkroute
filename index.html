@@ -78,7 +78,15 @@
 </head>
 <body>
 
-	<button id="add-stop-btn" onclick="prepareNewStop()" style="position:fixed; bottom:20px; left:10px; z-index:9999; background:var(--primary); color:white; width:50px; height:50px; border-radius:50%; font-size:30px; border:none; cursor:pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">+</button>
+	<button id="add-stop-btn" onclick="prepareNewStop()" 
+    style="position:fixed; bottom:20px; right:10px; z-index:9999; 
+           background:black; color:white; width:50px; height:50px; 
+           border-radius:50%; font-size:30px; border:2px solid white; 
+           cursor:pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); 
+           display:flex; align-items:center; justify-content:center; font-weight:bold;
+           transition: bottom 0.3s ease;">
+    +
+</button>
 
     <div id="overlay">
         <div id="overlay-content">
@@ -956,16 +964,23 @@ function activateAdmin(isSilent = false) {
         trigger.style.color = "var(--success)";
     }
     
+    // Move the Plus button UP to make room for Logout
+    const addBtn = document.getElementById('add-stop-btn');
+    if (addBtn) {
+        addBtn.style.bottom = "100px"; // Moves it above the logout button
+    }
+
     if (!document.getElementById('logout-btn')) {
         const logoutBtn = document.createElement('button');
         logoutBtn.id = 'logout-btn';
         logoutBtn.innerText = "🔒 LOGOUT";
-        logoutBtn.style = "position:fixed; bottom:20px; right:10px; z-index:9999; background:#ff4444; color:white; padding:10px; border-radius:8px; font-weight:bold; border:none; cursor:pointer;";
+        // Logout button stays at the very bottom (20px)
+        logoutBtn.style = "position:fixed; bottom:20px; right:10px; z-index:9999; background:#ff4444; color:white; padding:10px; border-radius:8px; font-weight:bold; border:none; cursor:pointer; width:100px;";
         logoutBtn.onclick = logout;
         document.body.appendChild(logoutBtn);
     }
 
-    // Refresh markers to make them draggable
+    // Refresh markers to make them draggable (as before)
     stopMarkers.forEach((marker, i) => {
         const pos = marker.getLatLng();
         const addr = stops[i].addr;
@@ -979,7 +994,6 @@ function activateAdmin(isSilent = false) {
         newMarker.bindTooltip(addr);
 
         newMarker.on('dragstart', () => { map.dragging.disable(); });
-        
         newMarker.on('dragend', (e) => {
             map.dragging.enable(); 
             const newPos = e.target.getLatLng();
@@ -997,6 +1011,10 @@ function activateAdmin(isSilent = false) {
 
 function logout() {
     localStorage.removeItem('adminSession');
+    // Move plus button back down before reload (optional but cleaner)
+    const addBtn = document.getElementById('add-stop-btn');
+    if (addBtn) addBtn.style.bottom = "20px";
+    
     alert("Logged out.");
     location.reload(); 
 }
@@ -1027,40 +1045,65 @@ function downloadUpdates() {
 }
 
 function prepareNewStop() {
-    // 1. Get User Location
     if (!navigator.geolocation) {
-        alert("Geolocation is not supported by your browser.");
+        alert("GPS is not supported by this browser.");
         return;
     }
 
-    alert("Capturing your current location... please stand at the front door.");
+    // Feedback for the user
+    const originalText = document.getElementById('add-stop-btn').innerText;
+    document.getElementById('add-stop-btn').innerText = "⌛";
 
     navigator.geolocation.getCurrentPosition((position) => {
-        const lat = position.coords.latitude.toFixed(6);
-        const lng = position.coords.longitude.toFixed(6);
+        document.getElementById('add-stop-btn').innerText = "+";
+        const lat = parseFloat(position.coords.latitude.toFixed(6));
+        const lng = parseFloat(position.coords.longitude.toFixed(6));
 
-        // 2. Ask for House Name/Number
-        const houseInfo = prompt(`Location Captured: ${lat}, ${lng}\n\nPlease enter the House Number or Name:`);
+        const houseInfo = prompt(`Location Captured!\nLat: ${lat}\nLng: ${lng}\n\nEnter House Number/Name:`);
 
         if (houseInfo) {
-            submitToAdmin(houseInfo, lat, lng);
+            if (isAdmin) {
+                // ADMIN FEATURE: Add it directly to the map right now
+                const newStop = { addr: houseInfo, lat: lat, lng: lng };
+                stops.push(newStop);
+                
+                let newMarker = L.marker([lat, lng], {
+                    draggable: true,
+                    riseOnHover: true
+                }).addTo(map);
+                
+                newMarker.bindTooltip(houseInfo);
+                
+                // Add the same dragging logic we use for existing markers
+                newMarker.on('dragend', (e) => {
+                    const pos = e.target.getLatLng();
+                    newStop.lat = parseFloat(pos.lat.toFixed(6));
+                    newStop.lng = parseFloat(pos.lng.toFixed(6));
+                    showSaveButton();
+                });
+
+                stopMarkers.push(newMarker);
+                markersMoved = true;
+                showSaveButton();
+                alert(`${houseInfo} added to map! Use the SAVE button to get the updated code.`);
+            } else {
+                // REGULAR USER: Send for confirmation
+                submitToAdmin(houseInfo, lat, lng);
+            }
         }
-    }, () => {
-        alert("Unable to retrieve your location. Make sure GPS is on.");
+    }, (err) => {
+        document.getElementById('add-stop-btn').innerText = "+";
+        alert("GPS Error: Please ensure location services are enabled.");
     });
 }
 
 function submitToAdmin(name, lat, lng) {
-    // This creates the exact line of code you need to add to your list
     const newStopCode = `{addr: "${name}", lat: ${lat}, lng: ${lng}},`;
+    const subject = encodeURIComponent("NEW CALL REQUEST: " + name);
+    const body = encodeURIComponent("Please confirm and add this location to the route:\n\n" + newStopCode);
     
-    const subject = encodeURIComponent("New Stop Request: " + name);
-    const body = encodeURIComponent("Admin, please add this new call to the map:\n\n" + newStopCode);
-    
-    // This opens the user's email to send the data to you
-    window.location.href = `mailto:2000abw@gmail.com?subject=${New Call}&body=${New Call}`;
-    
-    alert("Request generated! Please send the email to the admin for confirmation.");
+    window.location.href = `mailto:2000abw@gmail.com?subject=${subject}&body=${body}`;
+    alert("Request generated. Please hit 'Send' on the email to notify the admin.");
 }
 
 // Ensure tooltips are active on load (Call this after stopMarkers array is filled)
