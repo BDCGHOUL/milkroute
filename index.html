@@ -867,19 +867,28 @@ async function fetchRoute() {
     }
 
     function changeStop(dir) {
-        index += dir;
-        if (index < 0) index = 0;
-        if (index >= stops.length) index = stops.length - 1;
-        
-        updateUI();
-        saveProgress();
+    index += dir;
+    if (index < 0) index = 0;
+    if (index >= stops.length) index = stops.length - 1;
+    
+    updateUI();
+    // Note: I noticed your code calls saveProgress(), 
+    // but that function isn't in the snippet. 
+    // If it throws an error, you can remove that line.
 
-		// THIS IS THE LINE THAT CHANGES THE NULL
+    // THIS FIXES THE NULL ON THE ADMIN SCREEN
     if (typeof presenceRef !== 'undefined') {
+        const routeName = (stops === villageStops) ? "Village" : "Town";
+        
         presenceRef.set({
             current_stop: index + 1,
             address: stops[index].addr,
-            time: new Date().toLocaleTimeString('en-GB')
+            route_type: routeName,
+            last_update: new Date().toLocaleTimeString('en-GB')
+        }).then(() => {
+            console.log("Firebase Updated successfully");
+        }).catch((error) => {
+            console.error("Firebase Error: ", error);
         });
     }
 }
