@@ -874,8 +874,15 @@ async function fetchRoute() {
         updateUI();
         saveProgress();
 
-		presenceRef.set({ current_stop: index + 1, time: new Date().toLocaleTimeString() });
-    }
+		// THIS IS THE LINE THAT CHANGES THE NULL
+    if (typeof presenceRef !== 'undefined') {
+        presenceRef.set({
+            current_stop: index + 1,
+            address: stops[index].addr,
+            time: new Date().toLocaleTimeString('en-GB')
+        });
+    }
+}
 
 function toggle3D() {
         const s = stops[index];
